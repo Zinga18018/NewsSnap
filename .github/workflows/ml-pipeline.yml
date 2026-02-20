@@ -38,15 +38,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR Public
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 
       - name: Build, tag, and push Docker image
         id: build
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          ECR_REPOSITORY: llmops-training
+          ECR_REGISTRY: public.ecr.aws/b3e7b0p8
+          ECR_REPOSITORY: llmop
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -85,7 +85,7 @@ jobs:
 
           sm = boto3.client('sagemaker', region_name='us-east-1')
 
-          job_name = f'llmops-training-{datetime.now().strftime(\"%Y%m%d-%H%M%S\")}'
+          job_name = f'llmop-training-{datetime.now().strftime(\"%Y%m%d-%H%M%S\")}'
 
           sm.create_training_job(
               TrainingJobName=job_name,
@@ -99,13 +99,13 @@ jobs:
                   'DataSource': {
                       'S3DataSource': {
                           'S3DataType': 'S3Prefix',
-                          'S3Uri': 's3://llmops-ml-data-dev/processed/',
+                          'S3Uri': 's3://llmop-ml-data-dev/processed/',
                           'S3DataDistributionType': 'FullyReplicated',
                       }
                   },
                   'ContentType': 'application/json',
               }],
-              OutputDataConfig={'S3OutputPath': 's3://llmops-ml-models-dev/training-output/'},
+              OutputDataConfig={'S3OutputPath': 's3://llmop-ml-models-dev/training-output/'},
               ResourceConfig={
                   'InstanceType': 'ml.m5.large',
                   'InstanceCount': 1,

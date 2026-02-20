@@ -25,16 +25,16 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 # S3
-S3_BUCKET_DATA = os.getenv("S3_BUCKET_DATA", "llmops-ml-data")
-S3_BUCKET_MODELS = os.getenv("S3_BUCKET_MODELS", "llmops-ml-models")
-S3_BUCKET_METRICS = os.getenv("S3_BUCKET_METRICS", "llmops-ml-metrics")
+S3_BUCKET_DATA = os.getenv("S3_BUCKET_DATA", "llmop-ml-data-dev")
+S3_BUCKET_MODELS = os.getenv("S3_BUCKET_MODELS", "llmop-ml-models-dev")
+S3_BUCKET_METRICS = os.getenv("S3_BUCKET_METRICS", "llmop-ml-metrics-dev")
 
 # SageMaker
 SAGEMAKER_ROLE_ARN = os.getenv("SAGEMAKER_ROLE_ARN", "")
 SAGEMAKER_INSTANCE_TYPE = os.getenv("SAGEMAKER_INSTANCE_TYPE", "ml.m5.large")
 
 # ECR
-ECR_REPOSITORY = os.getenv("ECR_REPOSITORY", "llmops-training")
+ECR_REPOSITORY = os.getenv("ECR_REPOSITORY", "public.ecr.aws/b3e7b0p8/llmop")
 
 # ──────────────────────────────────────────────
 # Model Configuration

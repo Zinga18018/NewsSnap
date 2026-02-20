@@ -4,7 +4,7 @@
 variable "project_name" {
   description = "Project identifier used in resource naming"
   type        = string
-  default     = "llmops"
+  default     = "llmop"
 }
 
 variable "environment" {
@@ -25,7 +25,7 @@ variable "aws_region" {
 variable "s3_bucket_prefix" {
   description = "Prefix for S3 bucket names (must be globally unique)"
   type        = string
-  default     = "llmops-ml"
+  default     = "llmop-ml"
 }
 
 # ──────────────────────────────────────────────
