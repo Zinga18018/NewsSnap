@@ -1,30 +1,21 @@
 import React from "react";
 import {
-    LineChart,
-    Line,
+    AreaChart,
+    Area,
     XAxis,
     YAxis,
     CartesianGrid,
     Tooltip,
-    Legend,
     ResponsiveContainer,
 } from "recharts";
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null;
     return (
-        <div
-            style={{
-                background: "rgba(10, 10, 26, 0.95)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "10px",
-                padding: "12px 16px",
-                fontSize: "0.82rem",
-            }}
-        >
-            <p style={{ color: "#888", marginBottom: "6px" }}>Epoch {label}</p>
+        <div className="custom-tooltip">
+            <p className="tooltip-label">Epoch {label}</p>
             {payload.map((item, i) => (
-                <p key={i} style={{ color: item.color, fontWeight: 500 }}>
+                <p key={i} className="tooltip-item" style={{ color: item.color }}>
                     {item.name}: {typeof item.value === "number" ? item.value.toFixed(4) : item.value}
                 </p>
             ))}
@@ -32,42 +23,64 @@ const CustomTooltip = ({ active, payload, label }) => {
     );
 };
 
-export default function MetricsChart({ data, lines, xKey = "epoch" }) {
+export default function MetricsChart({ data, lines, xKey = "epoch", areaFill = false }) {
     if (!data || data.length === 0) {
-        return <div className="empty-state">No training data yet</div>;
+        return (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+                No training data yet
+            </div>
+        );
     }
 
     return (
-        <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+        <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                    {lines.map((line) => (
+                        <linearGradient key={`grad-${line.key}`} id={`grad-${line.key}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={line.color} stopOpacity={0.25} />
+                            <stop offset="100%" stopColor={line.color} stopOpacity={0} />
+                        </linearGradient>
+                    ))}
+                </defs>
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="rgba(255,255,255,0.03)"
+                    vertical={false}
+                />
                 <XAxis
                     dataKey={xKey}
-                    stroke="#555"
-                    fontSize={12}
+                    stroke="transparent"
+                    tick={{ fill: "#4a4a5a", fontSize: 11 }}
                     tickLine={false}
-                    label={{ value: "Epoch", position: "insideBottom", offset: -2, fill: "#666", fontSize: 11 }}
+                    axisLine={false}
                 />
-                <YAxis stroke="#555" fontSize={12} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                    wrapperStyle={{ fontSize: "0.78rem", paddingTop: "8px" }}
-                    iconType="circle"
-                    iconSize={8}
+                <YAxis
+                    stroke="transparent"
+                    tick={{ fill: "#4a4a5a", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
                 />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.06)" }} />
                 {lines.map((line) => (
-                    <Line
+                    <Area
                         key={line.key}
                         type="monotone"
                         dataKey={line.key}
                         stroke={line.color}
-                        name={line.name}
                         strokeWidth={2.5}
-                        dot={{ r: 4, fill: line.color, strokeWidth: 0 }}
-                        activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                        name={line.name}
+                        fill={areaFill ? `url(#grad-${line.key})` : "transparent"}
+                        dot={{ r: 4, fill: "#0f0f12", stroke: line.color, strokeWidth: 2 }}
+                        activeDot={{
+                            r: 6,
+                            fill: line.color,
+                            stroke: "#0f0f12",
+                            strokeWidth: 2,
+                        }}
                     />
                 ))}
-            </LineChart>
+            </AreaChart>
         </ResponsiveContainer>
     );
 }

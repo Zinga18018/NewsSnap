@@ -1,48 +1,57 @@
 import React from "react";
 
-function getCellColor(value, maxVal) {
-    const intensity = value / maxVal;
-    if (intensity > 0.8) return "rgba(16, 185, 129, 0.35)";
-    if (intensity > 0.3) return "rgba(245, 158, 11, 0.25)";
-    if (intensity > 0.05) return "rgba(239, 68, 68, 0.2)";
-    return "rgba(255, 255, 255, 0.02)";
+function getCellBg(value, maxVal, isDiagonal) {
+    if (isDiagonal) {
+        const intensity = Math.min(value / maxVal, 1);
+        return `rgba(52, 211, 153, ${0.06 + intensity * 0.2})`;
+    }
+    if (value === 0) return "transparent";
+    return `rgba(251, 113, 133, ${Math.min(value / maxVal, 0.2)})`;
 }
 
 export default function ConfusionMatrix({ matrix, labels }) {
     if (!matrix || matrix.length === 0) {
-        return <div className="empty-state">No evaluation data yet</div>;
+        return (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+                No evaluation data yet
+            </div>
+        );
     }
 
     const maxVal = Math.max(...matrix.flat());
+    const cols = labels.length + 1;
 
     return (
-        <table className="confusion-matrix">
-            <thead>
-                <tr>
-                    <th></th>
-                    {labels.map((label, i) => (
-                        <th key={i}>{label}</th>
-                    ))}
-                </tr>
-            </thead>
-            <tbody>
-                {matrix.map((row, i) => (
-                    <tr key={i}>
-                        <th>{labels[i]}</th>
-                        {row.map((val, j) => (
-                            <td
-                                key={j}
-                                style={{
-                                    background: getCellColor(i === j ? val : 0, maxVal),
-                                    color: i === j ? "#10b981" : val > 0 ? "#ef4444" : "#555",
-                                }}
+        <div
+            className="matrix-grid"
+            style={{ gridTemplateColumns: `60px repeat(${labels.length}, 1fr)` }}
+        >
+            {/* Header row */}
+            <div className="matrix-header-cell"></div>
+            {labels.map((label, i) => (
+                <div key={`h-${i}`} className="matrix-header-cell">{label}</div>
+            ))}
+
+            {/* Data rows */}
+            {matrix.map((row, i) => (
+                <React.Fragment key={`r-${i}`}>
+                    <div className="matrix-header-cell" style={{ textAlign: "right", paddingRight: "0.5rem" }}>
+                        {labels[i]}
+                    </div>
+                    {row.map((val, j) => {
+                        const isDiag = i === j;
+                        return (
+                            <div
+                                key={`c-${i}-${j}`}
+                                className={`matrix-cell ${isDiag ? "diagonal" : val > 0 ? "off-diagonal" : ""}`}
+                                style={{ background: getCellBg(val, maxVal, isDiag) }}
                             >
                                 {val}
-                            </td>
-                        ))}
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+                            </div>
+                        );
+                    })}
+                </React.Fragment>
+            ))}
+        </div>
     );
 }
