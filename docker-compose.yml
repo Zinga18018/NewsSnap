@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  # ── Local training run ──────────────────────
+  training:
+    build: .
+    container_name: llmops-training
+    env_file: .env
+    volumes:
+      - ./data:/opt/ml/input/data
+      - ./models:/opt/ml/model
+      - ./src:/opt/ml/code/src
+    environment:
+      - SM_MODEL_DIR=/opt/ml/model
+      - SM_CHANNEL_TRAINING=/opt/ml/input/data/training
+      - SM_NUM_GPUS=0
+    command: [ "python", "-m", "src.models.train" ]
+
+  # ── LocalStack (mock AWS for local dev) ─────
+  localstack:
+    image: localstack/localstack:latest
+    container_name: llmops-localstack
+    ports:
+      - "4566:4566" # All services gateway
+    environment:
+      - SERVICES=s3,sagemaker
+      - DEBUG=1
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+volumes:
+  localstack_data:
