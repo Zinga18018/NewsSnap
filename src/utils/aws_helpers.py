@@ -1,9 +1,5 @@
-"""
-AWS Helper Utilities
-Wrappers for common S3, ECR, and SageMaker operations.
-"""
+"""AWS helper utilities for S3 and SageMaker operations."""
 
-import json
 import os
 import sys
 import tarfile
@@ -11,13 +7,16 @@ import tempfile
 from datetime import datetime
 
 import boto3
-from botocore.exceptions import ClientError
+
+from src.utils.logging_config import setup_logging
 
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
     import config
 except ImportError:
     config = None
+
+logger = setup_logging(__name__)
 
 
 def get_s3_client():
@@ -35,7 +34,7 @@ def upload_file_to_s3(local_path: str, bucket: str, s3_key: str) -> str:
     s3 = get_s3_client()
     s3.upload_file(local_path, bucket, s3_key)
     uri = f"s3://{bucket}/{s3_key}"
-    print(f"[AWS] Uploaded {local_path} → {uri}")
+    logger.info("Uploaded %s to %s", local_path, uri)
     return uri
 
 
@@ -44,7 +43,7 @@ def download_file_from_s3(bucket: str, s3_key: str, local_path: str) -> str:
     s3 = get_s3_client()
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
     s3.download_file(bucket, s3_key, local_path)
-    print(f"[AWS] Downloaded s3://{bucket}/{s3_key} → {local_path}")
+    logger.info("Downloaded s3://%s/%s to %s", bucket, s3_key, local_path)
     return local_path
 
 
@@ -53,7 +52,10 @@ def list_s3_objects(bucket: str, prefix: str = "") -> list:
     s3 = get_s3_client()
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     objects = response.get("Contents", [])
-    return [{"key": obj["Key"], "size": obj["Size"], "modified": str(obj["LastModified"])} for obj in objects]
+    return [
+        {"key": obj["Key"], "size": obj["Size"], "modified": str(obj["LastModified"])}
+        for obj in objects
+    ]
 
 
 def create_model_tarball(model_dir: str, output_path: str = None) -> str:
@@ -68,7 +70,7 @@ def create_model_tarball(model_dir: str, output_path: str = None) -> str:
         for item in os.listdir(model_dir):
             tar.add(os.path.join(model_dir, item), arcname=item)
 
-    print(f"[AWS] Created model tarball: {output_path}")
+    logger.info("Created model tarball at %s", output_path)
     return output_path
 
 
@@ -80,7 +82,6 @@ def upload_model_to_s3(model_dir: str, bucket: str = None, prefix: str = "latest
     s3_key = f"{prefix}/model.tar.gz"
     s3_uri = upload_file_to_s3(tarball_path, bucket, s3_key)
 
-    # Clean up temp file
     os.remove(tarball_path)
     return s3_uri
 
@@ -107,7 +108,6 @@ def create_sagemaker_training_job(
     instance_type = instance_type or getattr(config, "SAGEMAKER_INSTANCE_TYPE", "ml.m5.large")
     data_bucket = getattr(config, "S3_BUCKET_DATA", "llmops-ml-data-dev")
     models_bucket = getattr(config, "S3_BUCKET_MODELS", "llmops-ml-models-dev")
-    ecr_repo = getattr(config, "ECR_REPOSITORY", "llmops-training")
 
     input_s3_uri = input_s3_uri or f"s3://{data_bucket}/processed/"
     output_s3_uri = output_s3_uri or f"s3://{models_bucket}/training-output/"
@@ -129,17 +129,19 @@ def create_sagemaker_training_job(
             "TrainingImage": image_uri,
             "TrainingInputMode": "File",
         },
-        InputDataConfig=[{
-            "ChannelName": "training",
-            "DataSource": {
-                "S3DataSource": {
-                    "S3DataType": "S3Prefix",
-                    "S3Uri": input_s3_uri,
-                    "S3DataDistributionType": "FullyReplicated",
-                }
-            },
-            "ContentType": "application/json",
-        }],
+        InputDataConfig=[
+            {
+                "ChannelName": "training",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": input_s3_uri,
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+                "ContentType": "application/json",
+            }
+        ],
         OutputDataConfig={"S3OutputPath": output_s3_uri},
         ResourceConfig={
             "InstanceType": instance_type,
@@ -150,7 +152,7 @@ def create_sagemaker_training_job(
         HyperParameters=default_hyperparameters,
     )
 
-    print(f"[AWS] Created training job: {job_name}")
+    logger.info("Created SageMaker training job %s", job_name)
     return {"job_name": job_name, "response": response}
 
 

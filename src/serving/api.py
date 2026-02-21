@@ -1,58 +1,64 @@
-"""
-FastAPI Inference Server for LLMOps
-Serves DistilBERT text classification predictions.
-
-- Real mode:  loads trained model from models/latest/
-- Demo mode:  if no model exists, uses keyword heuristics for realistic predictions
-
-Run:  uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
-"""
+"""FastAPI inference service for AG News text classification."""
 
 import json
 import os
 import random
 import re
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-# ── App ──
-app = FastAPI(
-    title="LLMOps Inference API",
-    description="AG News text classification — DistilBERT",
-    version="1.0.0",
-)
+from src.utils.logging_config import setup_logging
+from src.utils.rate_limiter import EndpointRateLimiter, RateLimiterMiddleware
+from src.utils.validation import ValidationError, validate_text
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+logger = setup_logging(__name__)
 
 LABEL_MAP = {0: "World", 1: "Sports", 2: "Business", 3: "Sci/Tech"}
 MODEL_DIR = os.environ.get("MODEL_DIR", "models/latest")
+MAX_TEXTS_PER_REQUEST = 32
+MAX_TEXT_LENGTH = 5000
 
-# ── State ──
 _model_state = {"mode": None, "artifacts": None, "loaded_at": None}
+_start_time = time.time()
 
 
-# ── Request / Response schemas ──
 class PredictRequest(BaseModel):
     text: Optional[str] = None
     texts: Optional[List[str]] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {"text": "Apple releases new AI chip for data centers"},
                 {"texts": ["NASA launches satellite", "Lakers win championship"]},
             ]
         }
+    )
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def validate_text_field(cls, value):
+        if value is not None and not isinstance(value, str):
+            raise ValueError("text must be a string")
+        return value
+
+    @field_validator("texts", mode="before")
+    @classmethod
+    def validate_texts_field(cls, value):
+        if value is not None:
+            if not isinstance(value, list):
+                raise ValueError("texts must be a list of strings")
+            if len(value) > MAX_TEXTS_PER_REQUEST:
+                raise ValueError(f"Maximum {MAX_TEXTS_PER_REQUEST} texts per request")
+            if not all(isinstance(text, str) for text in value):
+                raise ValueError("All items in texts must be strings")
+        return value
 
 
 class ClassProbabilities(BaseModel):
@@ -61,8 +67,7 @@ class ClassProbabilities(BaseModel):
     Business: float
     SciTech: float = Field(alias="Sci/Tech")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class PredictionResult(BaseModel):
@@ -87,21 +92,17 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
 
 
-_start_time = time.time()
-
-
-# ── Demo mode heuristics ──
 _KEYWORD_RULES = {
-    0: [  # World
+    0: [
         r"\b(war|peace|government|president|minister|election|vote|country|nation|treaty|UN|united nations|summit|diplomat|refugee|military|army|conflict|politics|foreign|border|sanction|humanitarian)\b",
     ],
-    1: [  # Sports
+    1: [
         r"\b(goal|score|win|won|defeat|champion|league|team|player|coach|game|match|tournament|cup|olympic|medal|NFL|NBA|FIFA|cricket|football|soccer|tennis|baseball|basketball|race|athlete)\b",
     ],
-    2: [  # Business
+    2: [
         r"\b(stock|market|shares|revenue|profit|company|CEO|billion|million|IPO|invest|acquisition|merger|earnings|growth|trade|economy|financial|bank|startup|venture|sales|quarterly|fiscal)\b",
     ],
-    3: [  # Sci/Tech
+    3: [
         r"\b(AI|algorithm|software|hardware|chip|processor|satellite|NASA|space|research|scientist|technology|digital|internet|cyber|data|quantum|robot|biotech|genome|innovation|compute|launch|discover)\b",
     ],
 }
@@ -114,81 +115,105 @@ def _demo_predict(texts: List[str]) -> List[dict]:
         scores = {}
         text_lower = text.lower()
         for label_id, patterns in _KEYWORD_RULES.items():
-            count = sum(len(re.findall(p, text_lower, re.IGNORECASE)) for p in patterns)
+            count = sum(len(re.findall(pattern, text_lower, re.IGNORECASE)) for pattern in patterns)
             scores[label_id] = count + random.uniform(0.01, 0.3)
 
-        # If no strong signal, bias toward Sci/Tech (common for "tech" demos)
         total = sum(scores.values())
         if total < 1.0:
-            scores[3] += 0.5  # slight Sci/Tech bias
+            scores[3] += 0.5
             total = sum(scores.values())
 
-        # Normalize to probabilities and add realism
-        probs = {}
-        for lid in range(4):
-            probs[lid] = scores.get(lid, 0.01) / total
+        probs = {label_id: scores.get(label_id, 0.01) / total for label_id in range(4)}
 
-        # Make winner more confident (simulate trained model behavior)
         pred_label = max(probs, key=probs.get)
-        boost = random.uniform(0.15, 0.3)
-        probs[pred_label] += boost
-        total_p = sum(probs.values())
-        probs = {k: round(v / total_p, 4) for k, v in probs.items()}
+        probs[pred_label] += random.uniform(0.15, 0.3)
+        total_prob = sum(probs.values())
+        probs = {key: round(value / total_prob, 4) for key, value in probs.items()}
 
-        results.append({
-            "text": text[:200] + "..." if len(text) > 200 else text,
-            "label": LABEL_MAP[pred_label],
-            "confidence": round(probs[pred_label], 4),
-            "probabilities": {LABEL_MAP[k]: v for k, v in probs.items()},
-            "model": "demo-heuristic",
-            "latency_ms": round(random.uniform(1, 8), 2),
-        })
+        results.append(
+            {
+                "text": text[:200] + "..." if len(text) > 200 else text,
+                "label": LABEL_MAP[pred_label],
+                "confidence": round(probs[pred_label], 4),
+                "probabilities": {LABEL_MAP[key]: value for key, value in probs.items()},
+                "model": "demo-heuristic",
+                "latency_ms": round(random.uniform(1, 8), 2),
+            }
+        )
     return results
 
 
 def _real_predict(texts: List[str]) -> List[dict]:
-    """Real DistilBERT inference using the loaded model."""
+    """Real DistilBERT inference using loaded model artifacts."""
     from src.serving.inference import input_fn, predict_fn
 
-    t0 = time.time()
+    started = time.time()
     input_data = input_fn(json.dumps({"text": texts}))
     raw_results = predict_fn(input_data, _model_state["artifacts"])
-    elapsed = (time.time() - t0) * 1000
+    elapsed_ms = (time.time() - started) * 1000
 
-    results = []
-    per_item_ms = elapsed / len(texts) if texts else 0
-    for r in raw_results:
-        results.append({
-            "text": r["text"],
-            "label": r["predicted_class"],
-            "confidence": r["confidence"],
-            "probabilities": r["probabilities"],
+    per_item_ms = elapsed_ms / len(texts) if texts else 0
+    return [
+        {
+            "text": item["text"],
+            "label": item["predicted_class"],
+            "confidence": item["confidence"],
+            "probabilities": item["probabilities"],
             "model": "distilbert-base-uncased",
             "latency_ms": round(per_item_ms, 2),
-        })
-    return results
+        }
+        for item in raw_results
+    ]
 
 
-# ── Startup ──
-@app.on_event("startup")
-def load_model():
+def _load_model() -> None:
+    """Load model on startup with fallback to demo mode."""
     model_path = Path(MODEL_DIR)
+    logger.info("Attempting to load model from %s", MODEL_DIR)
+
     if model_path.exists() and (model_path / "config.json").exists():
         try:
             from src.serving.inference import model_fn
+
             _model_state["artifacts"] = model_fn(str(model_path))
             _model_state["mode"] = "real"
             _model_state["loaded_at"] = time.time()
-            print(f"[API] Loaded model from {MODEL_DIR}")
-        except Exception as e:
-            print(f"[API] Failed to load model: {e}. Falling back to demo mode.")
-            _model_state["mode"] = "demo"
-    else:
-        print(f"[API] No model at {MODEL_DIR}. Running in demo mode.")
-        _model_state["mode"] = "demo"
+            logger.info("Successfully loaded model from %s", MODEL_DIR)
+            return
+        except Exception as exc:
+            logger.warning("Failed to load model: %s. Falling back to demo mode.", exc)
+
+    _model_state["mode"] = "demo"
+    _model_state["artifacts"] = None
+    _model_state["loaded_at"] = time.time()
+    logger.warning("Running in demo mode")
 
 
-# ── Endpoints ──
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    _load_model()
+    yield
+
+
+app = FastAPI(
+    title="LLMOps Inference API",
+    description="AG News text classification - DistilBERT",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(RateLimiterMiddleware, requests_per_minute=100)
+
+endpoint_limiter = EndpointRateLimiter()
+endpoint_limiter.set_limit("predict", requests_per_window=50, window_seconds=60)
+
+
 @app.get("/health", response_model=HealthResponse)
 def health():
     return {
@@ -200,31 +225,49 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
-    # Extract texts from request
-    texts = []
-    if req.text:
-        texts = [req.text]
-    elif req.texts:
-        texts = req.texts
-    else:
-        raise HTTPException(status_code=400, detail="Provide 'text' (string) or 'texts' (list)")
+async def predict(req: PredictRequest, request: Request):
+    """Run inference on provided text(s)."""
+    try:
+        client_ip = request.client.host if request.client else "unknown"
+        await endpoint_limiter.rate_limit_check("predict", client_ip)
 
-    if len(texts) > 32:
-        raise HTTPException(status_code=400, detail="Max 32 texts per request")
+        if req.text is not None:
+            texts = [validate_text(req.text, min_length=1, max_length=MAX_TEXT_LENGTH, name="text")]
+        elif req.texts is not None:
+            texts = [
+                validate_text(text, min_length=1, max_length=MAX_TEXT_LENGTH, name=f"texts[{idx}]")
+                for idx, text in enumerate(req.texts)
+            ]
+        else:
+            logger.warning("Prediction request missing both text and texts")
+            raise HTTPException(
+                status_code=400,
+                detail="Provide either 'text' (string) or 'texts' (list of strings)",
+            )
 
-    # Predict
-    mode = _model_state.get("mode", "demo")
-    if mode == "real":
-        predictions = _real_predict(texts)
-    else:
-        predictions = _demo_predict(texts)
+        if not texts:
+            logger.warning("Prediction request with empty texts")
+            raise HTTPException(status_code=400, detail="Texts cannot be empty")
 
-    return {
-        "predictions": predictions,
-        "mode": mode,
-        "model_dir": MODEL_DIR if mode == "real" else None,
-    }
+        logger.info("Prediction request from %s: %d text(s)", client_ip, len(texts))
+
+        mode = _model_state.get("mode") or "demo"
+        predictions = _real_predict(texts) if mode == "real" else _demo_predict(texts)
+
+        logger.debug("Prediction completed: %d results", len(predictions))
+        return {
+            "predictions": predictions,
+            "mode": mode,
+            "model_dir": MODEL_DIR if mode == "real" else None,
+        }
+    except ValidationError as exc:
+        logger.error("Validation error: %s", exc)
+        raise HTTPException(status_code=422, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected error in predict: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/")

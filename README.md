@@ -1,94 +1,69 @@
-# 🚀 LLMOps — End-to-End ML Operations Pipeline
+# LLMOps AG News Classifier
 
-A production-grade MLOps pipeline for text classification using **AWS**, **Terraform**, **Docker**, **GitHub Actions**, and **Netlify**.
+Local-first MLOps project for AG News text classification using DistilBERT, FastAPI, and a React dashboard.
 
-## Architecture
+## What is included
+- Data ingestion and preprocessing (`src/data/*`)
+- Local model training and evaluation (`src/models/*`)
+- Inference API with rate limiting and validation (`src/serving/api.py`)
+- Dashboard with live prediction page (`dashboard/`)
+- Optional AWS/SageMaker utilities (not required for local usage)
 
-```
-Local Dev → GitHub → CI/CD (GitHub Actions) → AWS (S3, ECR, SageMaker, Lambda, CloudWatch) → Netlify Dashboard
-```
+## Quick Start (Local, No SageMaker)
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Infrastructure** | Terraform (AWS: S3, ECR, IAM, SageMaker, Lambda, CloudWatch) |
-| **ML Framework** | PyTorch + HuggingFace Transformers (DistilBERT) |
-| **Dataset** | AG News (120K articles, 4-class classification) |
-| **Containerization** | Docker + Docker Compose |
-| **CI/CD** | GitHub Actions (3 workflows: CI, Terraform, ML Pipeline) |
-| **Dashboard** | React + Vite + Recharts, deployed on Netlify |
-| **Monitoring** | CloudWatch + S3 metrics + Netlify dashboard |
-
-## Quick Start
-
-### 1. Setup
+### 1. Install dependencies
 ```bash
-# Clone and configure
-cp .env.example .env
-# Edit .env with your AWS credentials
-
-# Install Python deps
 pip install -r requirements.txt
+cd dashboard && npm install && cd ..
 ```
 
-### 2. Data Pipeline
+### 2. Run local pipeline (fast default)
+This creates a real local model at `models/latest`.
 ```bash
-# Download & preprocess AG News
-python -m src.data.ingestion
-python -m src.data.preprocessing
+py scripts/run_local_pipeline.py
 ```
 
-### 3. Train Locally (Docker)
+Use full dataset training if needed:
 ```bash
-docker-compose up training
-# or
-python -m src.models.train --data-dir data/processed --model-dir models/latest
+py scripts/run_local_pipeline.py --max-train-samples 0 --max-val-samples 0 --epochs 3 --batch-size 32
 ```
 
-### 4. Evaluate
+### 3. Run API
 ```bash
-python -m src.models.evaluate --model-dir models/latest --test-data data/processed/test.jsonl
+py -m uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
 ```
 
-### 5. Deploy Infrastructure
+Check health:
 ```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
+curl http://127.0.0.1:8000/health
 ```
+If model loaded, response includes `"mode":"real"`.
 
-### 6. Dashboard
+### 4. Run dashboard
 ```bash
 cd dashboard
-npm install
-npm run dev
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+Open `http://127.0.0.1:5173`.
+
+## Optional AWS path
+AWS/SageMaker scripts and Terraform are still in the repo, but optional. You can complete the entire project locally without AWS costs.
+
+## Useful commands
+```bash
+# Tests
+py -m pytest -q
+
+# Train only
+py -m src.models.train --data-dir data/processed --model-dir models/latest --epochs 1 --max-train-samples 3000 --max-val-samples 600
+
+# Evaluate only
+py -m src.models.evaluate --model-dir models/latest --test-data data/processed/test.jsonl
 ```
 
-## GitHub Actions Secrets Required
-
-| Secret | Description |
-|--------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `SAGEMAKER_ROLE_ARN` | SageMaker execution role ARN (from Terraform output) |
-
-## Project Structure
-
+## Git push checklist
+```bash
+git add .
+git commit -m "Local-first pipeline + realtime dashboard + API hardening"
+git push
 ```
-LLMOPS/
-├── terraform/          # Infrastructure as Code (10 files)
-├── src/                # ML pipeline (data, models, serving, utils)
-├── scripts/            # CLI tools (trigger_training, deploy_model)
-├── .github/workflows/  # CI/CD (ci, terraform, ml-pipeline)
-├── dashboard/          # React monitoring dashboard (Netlify)
-├── tests/              # Unit tests
-├── Dockerfile          # SageMaker-compatible container
-├── docker-compose.yml  # Local dev stack
-└── config.py           # Central configuration
-```
-
-## License
-
-MIT

@@ -11,11 +11,15 @@ from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 
+from src.utils.logging_config import setup_logging
+
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
     import config
 except ImportError:
     config = None
+
+logger = setup_logging(__name__)
 
 
 class MetricsLogger:
@@ -33,10 +37,9 @@ class MetricsLogger:
             self._aws_available = True
         except Exception:
             self._aws_available = False
-            print("[Metrics] AWS not available, logging locally only")
+            logger.warning("AWS not available, logging metrics locally only")
 
-    def log_metric(self, name: str, value: float, unit: str = "None",
-                   dimensions: dict = None):
+    def log_metric(self, name: str, value: float, unit: str = "None", dimensions: dict = None):
         """
         Log a single metric to CloudWatch.
 
@@ -66,17 +69,26 @@ class MetricsLogger:
                     MetricData=[metric_data],
                 )
             except ClientError as e:
-                print(f"[Metrics] CloudWatch error: {e}")
+                logger.warning("CloudWatch metric publish failed: %s", e)
 
         # Track locally
-        self._history.append({
-            "name": name,
-            "value": value,
-            "timestamp": datetime.utcnow().isoformat(),
-        })
+        self._history.append(
+            {
+                "name": name,
+                "value": value,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
-    def log_training_epoch(self, epoch: int, train_loss: float, train_acc: float,
-                           val_loss: float, val_acc: float, val_f1: float):
+    def log_training_epoch(
+        self,
+        epoch: int,
+        train_loss: float,
+        train_acc: float,
+        val_loss: float,
+        val_acc: float,
+        val_f1: float,
+    ):
         """Log all metrics for a training epoch."""
         dims = {"Epoch": str(epoch)}
         self.log_metric("TrainLoss", train_loss, dimensions=dims)
@@ -93,7 +105,7 @@ class MetricsLogger:
     def save_to_s3(self, key_prefix: str = "public"):
         """Save the full metrics history to S3 as JSON for the dashboard."""
         if not self._aws_available:
-            print("[Metrics] Skipping S3 save — AWS not available")
+            logger.info("Skipping S3 save: AWS not available")
             return
 
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -120,18 +132,21 @@ class MetricsLogger:
                 ContentType="application/json",
             )
 
-            print(f"[Metrics] Saved metrics to S3: {self.bucket}/{key_prefix}/latest_metrics.json")
+            logger.info(
+                "Saved metrics to S3: %s/%s/latest_metrics.json",
+                self.bucket,
+                key_prefix,
+            )
         except ClientError as e:
-            print(f"[Metrics] S3 save error: {e}")
+            logger.warning("S3 save error: %s", e)
 
     def save_locally(self, filepath: str = "metrics_history.json"):
         """Save metrics history to a local JSON file."""
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self._history, f, indent=2)
-        print(f"[Metrics] Saved {len(self._history)} metrics to {filepath}")
+        logger.info("Saved %d metrics to %s", len(self._history), filepath)
 
 
-# ── Convenience singleton ─────────────────────
 _logger = None
 
 

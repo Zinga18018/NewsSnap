@@ -1,19 +1,18 @@
-"""
-Data Preprocessing Module
-Tokenizes text data and creates train/val/test splits for model training.
-"""
+"""Data preprocessing pipeline for AG News model training."""
 
 import json
 import os
-from pathlib import Path
+import sys
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer
 
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 import config
+from src.utils.logging_config import setup_logging
+
+logger = setup_logging(__name__)
 
 
 def load_jsonl(filepath: str) -> pd.DataFrame:
@@ -29,9 +28,7 @@ def clean_text(text: str) -> str:
     """Basic text cleaning for news articles."""
     if not isinstance(text, str):
         return ""
-    # Remove excessive whitespace
     text = " ".join(text.split())
-    # Remove very short texts
     if len(text) < 10:
         return ""
     return text
@@ -65,8 +62,12 @@ def tokenize_dataset(texts: list, tokenizer, max_length: int = None) -> dict:
     }
 
 
-def create_splits(df: pd.DataFrame, val_size: float = 0.1, test_size: float = 0.1,
-                  random_state: int = 42) -> tuple:
+def create_splits(
+    df: pd.DataFrame,
+    val_size: float = 0.1,
+    test_size: float = 0.1,
+    random_state: int = 42,
+) -> tuple:
     """
     Split data into train/val/test sets with stratification.
 
@@ -79,19 +80,27 @@ def create_splits(df: pd.DataFrame, val_size: float = 0.1, test_size: float = 0.
     Returns:
         Tuple of (train_df, val_df, test_df)
     """
-    # First split: train+val vs test
     train_val_df, test_df = train_test_split(
-        df, test_size=test_size, random_state=random_state, stratify=df["label"]
+        df,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=df["label"],
     )
 
-    # Second split: train vs val
     relative_val_size = val_size / (1 - test_size)
     train_df, val_df = train_test_split(
-        train_val_df, test_size=relative_val_size, random_state=random_state,
-        stratify=train_val_df["label"]
+        train_val_df,
+        test_size=relative_val_size,
+        random_state=random_state,
+        stratify=train_val_df["label"],
     )
 
-    print(f"[Preprocessing] Splits: train={len(train_df)}, val={len(val_df)}, test={len(test_df)}")
+    logger.info(
+        "Created splits: train=%d val=%d test=%d",
+        len(train_df),
+        len(val_df),
+        len(test_df),
+    )
     return train_df, val_df, test_df
 
 
@@ -111,47 +120,43 @@ def preprocess_pipeline(input_dir: str = None, output_dir: str = None) -> dict:
     output_dir = output_dir or str(config.DATA_DIR / "processed")
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load raw data
     train_path = os.path.join(input_dir, "ag_news_train.jsonl")
     df = load_jsonl(train_path)
-    print(f"[Preprocessing] Loaded {len(df)} samples from {train_path}")
+    logger.info("Loaded %d raw samples from %s", len(df), train_path)
 
-    # Clean
     df["text"] = df["text"].apply(clean_text)
     df = df[df["text"].str.len() > 0].reset_index(drop=True)
-    print(f"[Preprocessing] After cleaning: {len(df)} samples")
+    logger.info("After cleaning: %d samples", len(df))
 
-    # Split
     train_df, val_df, test_df = create_splits(df)
 
-    # Save splits as JSONL
     results = {}
     for split_name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
         filepath = os.path.join(output_dir, f"{split_name}.jsonl")
         split_df.to_json(filepath, orient="records", lines=True)
         results[split_name] = {"path": filepath, "count": len(split_df)}
-        print(f"[Preprocessing] Saved {split_name}: {len(split_df)} samples → {filepath}")
+        logger.info("Saved %s split: %d samples -> %s", split_name, len(split_df), filepath)
 
-    # Save tokenizer info
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
-    tokenizer.save_pretrained(os.path.join(output_dir, "tokenizer"))
-    print(f"[Preprocessing] Tokenizer saved to {output_dir}/tokenizer")
+    tokenizer_path = os.path.join(output_dir, "tokenizer")
+    tokenizer.save_pretrained(tokenizer_path)
+    logger.info("Tokenizer saved to %s", tokenizer_path)
 
-    # Upload to S3 if credentials available
     if config.AWS_ACCESS_KEY_ID:
         try:
             from src.data.ingestion import upload_to_s3
+
             for split_name, info in results.items():
                 s3_uri = upload_to_s3(info["path"], f"processed/{split_name}.jsonl")
                 results[split_name]["s3_uri"] = s3_uri
-        except Exception as e:
-            print(f"[Preprocessing] S3 upload skipped: {e}")
+        except Exception as exc:
+            logger.warning("S3 upload skipped: %s", exc)
 
     return results
 
 
 if __name__ == "__main__":
-    results = preprocess_pipeline()
-    print("\n[Preprocessing] Complete!")
-    for split, info in results.items():
-        print(f"  {split}: {info['count']} samples")
+    pipeline_results = preprocess_pipeline()
+    logger.info("Preprocessing complete")
+    for split, info in pipeline_results.items():
+        logger.info("%s: %d samples", split, info["count"])

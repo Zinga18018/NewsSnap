@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -25,9 +25,12 @@ export default function TestModelPage() {
     const [history, setHistory] = useState([]);
     const [error, setError] = useState(null);
     const [serverStatus, setServerStatus] = useState(null);
+    const [realtime, setRealtime] = useState(true);
+    const lastSubmittedRef = useRef("");
 
     const classify = useCallback(async (text) => {
-        if (!text.trim()) return;
+        const trimmed = text.trim();
+        if (!trimmed) return;
         setLoading(true);
         setError(null);
         setResult(null);
@@ -36,7 +39,7 @@ export default function TestModelPage() {
             const res = await fetch(`${API_URL}/predict`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: text.trim() }),
+                body: JSON.stringify({ text: trimmed }),
             });
 
             if (!res.ok) {
@@ -49,12 +52,25 @@ export default function TestModelPage() {
             setResult(newResult);
             setHistory((h) => [newResult, ...h].slice(0, 10));
             setServerStatus(data.mode);
+            lastSubmittedRef.current = trimmed;
         } catch (err) {
             setError(err.message.includes("fetch") ? "Cannot reach API. Start the server: uvicorn src.serving.api:app --port 8000" : err.message);
         } finally {
             setLoading(false);
         }
     }, []);
+
+    useEffect(() => {
+        if (!realtime) return;
+        const trimmed = input.trim();
+        if (trimmed.length < 5 || trimmed === lastSubmittedRef.current) return;
+
+        const timer = setTimeout(() => {
+            classify(trimmed);
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, [input, realtime, classify]);
 
     const useSample = (text) => {
         setInput(text);
@@ -103,6 +119,13 @@ export default function TestModelPage() {
                     <button className="clear-btn" onClick={() => { setInput(""); setResult(null); setError(null); }}>
                         Clear
                     </button>
+                    <button
+                        className="clear-btn"
+                        onClick={() => setRealtime((v) => !v)}
+                        title="Toggle live classification while typing"
+                    >
+                        {realtime ? "Realtime On" : "Realtime Off"}
+                    </button>
                 </div>
 
                 {/* Sample Prompts */}
@@ -129,14 +152,7 @@ export default function TestModelPage() {
             {result && (
                 <div className="predict-result-card card" style={{ borderColor: LABEL_COLORS[result.label]?.border }}>
                     <div className="result-header">
-                        <div
-                            className="result-label-badge"
-                            style={{
-                                background: LABEL_COLORS[result.label]?.bg,
-                                color: LABEL_COLORS[result.label]?.text,
-                                borderColor: LABEL_COLORS[result.label]?.border,
-                            }}
-                        >
+                        <div className="result-label-badge">
                             {result.label}
                         </div>
                         <div className="result-meta">
