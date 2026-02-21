@@ -28,29 +28,6 @@ const Icons = {
     testmodel: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>,
 };
 
-/* ── Raw epoch data → simulated daily/weekly aggregates ── */
-function generateDailyData(epochData) {
-    // Simulate 7 days of training data from epoch snapshots
-    return [
-        { day: "Mon", train_loss: 0.52, val_loss: 0.41, train_acc: 0.812, val_acc: 0.845, val_f1: 0.842 },
-        { day: "Tue", train_loss: 0.44, val_loss: 0.35, train_acc: 0.842, val_acc: 0.872, val_f1: 0.870 },
-        { day: "Wed", train_loss: 0.38, val_loss: 0.30, train_acc: 0.867, val_acc: 0.891, val_f1: 0.889 },
-        { day: "Thu", train_loss: 0.28, val_loss: 0.27, train_acc: 0.901, val_acc: 0.903, val_f1: 0.902 },
-        { day: "Fri", train_loss: 0.21, val_loss: 0.25, train_acc: 0.925, val_acc: 0.910, val_f1: 0.909 },
-        { day: "Sat", train_loss: 0.17, val_loss: 0.24, train_acc: 0.942, val_acc: 0.912, val_f1: 0.912 },
-        { day: "Sun", train_loss: 0.14, val_loss: 0.24, train_acc: 0.953, val_acc: 0.914, val_f1: 0.914 },
-    ];
-}
-
-function generateWeeklyData(epochData) {
-    return [
-        { week: "Wk 1", train_loss: 0.58, val_loss: 0.46, train_acc: 0.792, val_acc: 0.821, val_f1: 0.818 },
-        { week: "Wk 2", train_loss: 0.38, val_loss: 0.31, train_acc: 0.871, val_acc: 0.889, val_f1: 0.888 },
-        { week: "Wk 3", train_loss: 0.22, val_loss: 0.25, train_acc: 0.921, val_acc: 0.908, val_f1: 0.908 },
-        { week: "Wk 4", train_loss: 0.14, val_loss: 0.24, train_acc: 0.953, val_acc: 0.914, val_f1: 0.914 },
-    ];
-}
-
 const DEMO_METRICS = {
     accuracy: 0.9142,
     f1_weighted: 0.9138,
@@ -112,7 +89,6 @@ function App() {
     const [labels, setLabels] = useState(DEMO_LABELS);
     const [pipeline, setPipeline] = useState(DEMO_PIPELINE);
     const [activeNav, setActiveNav] = useState("insights");
-    const [timescale, setTimescale] = useState("epoch");
     const [lastRefresh, setLastRefresh] = useState(new Date());
 
     useEffect(() => {
@@ -161,9 +137,9 @@ function App() {
     const renderPageContent = () => {
         switch (activeNav) {
             case "insights":
-                return <InsightsPage metrics={metrics} history={history} prData={prData} confusion={confusion} labels={labels} pipeline={pipeline} timescale={timescale} setTimescale={setTimescale} lastRefresh={lastRefresh} />;
+                return <InsightsPage metrics={metrics} history={history} prData={prData} confusion={confusion} labels={labels} pipeline={pipeline} lastRefresh={lastRefresh} isLiveData={Boolean(METRICS_URL)} />;
             case "training":
-                return <TrainingPage history={history} timescale={timescale} setTimescale={setTimescale} />;
+                return <TrainingPage history={history} lastRefresh={lastRefresh} isLiveData={Boolean(METRICS_URL)} />;
             case "models":
                 return <ModelsPage />;
             case "endpoints":
@@ -230,12 +206,7 @@ function App() {
 }
 
 /* ─── TIMESCALE SELECTOR ─── */
-function TimescaleBar({ timescale, setTimescale, lastRefresh }) {
-    const scales = [
-        { id: "epoch", label: "Per Epoch" },
-        { id: "daily", label: "Daily" },
-        { id: "weekly", label: "Weekly" },
-    ];
+function DataRefreshBar({ lastRefresh, isLiveData }) {
     return (
         <div className="config-bar">
             <div className="refresh-info">
@@ -243,11 +214,10 @@ function TimescaleBar({ timescale, setTimescale, lastRefresh }) {
                 <span className="refresh-text">Updated {lastRefresh ? lastRefresh.toLocaleTimeString() : "now"}</span>
             </div>
             <div className="spacer" />
-            {scales.map(s => (
-                <button key={s.id} className={`period-pill ${timescale === s.id ? "active" : ""}`} onClick={() => setTimescale(s.id)}>
-                    {s.label}
-                </button>
-            ))}
+            <span className={`source-chip ${isLiveData ? "live" : "demo"}`}>
+                {isLiveData ? "Live metrics" : "Demo metrics"}
+            </span>
+            <span className="refresh-chip">Per-epoch view</span>
             <button className="refresh-btn" onClick={() => window.location.reload()} title="Refresh data">
                 {Icons.refresh}
             </button>
@@ -256,30 +226,22 @@ function TimescaleBar({ timescale, setTimescale, lastRefresh }) {
 }
 
 /* ─── CHART DATA HOOK ─── */
-function useTimescaledData(epochHistory, timescale) {
-    return useMemo(() => {
-        if (timescale === "daily") {
-            return { data: generateDailyData(epochHistory), xKey: "day", xLabel: "Day" };
-        }
-        if (timescale === "weekly") {
-            return { data: generateWeeklyData(epochHistory), xKey: "week", xLabel: "Week" };
-        }
-        return { data: epochHistory, xKey: "epoch", xLabel: "Epoch" };
-    }, [epochHistory, timescale]);
+function useEpochChartData(epochHistory) {
+    return useMemo(() => ({ data: epochHistory, xKey: "epoch", xLabel: "Epoch" }), [epochHistory]);
 }
 
 /* ─── INSIGHTS PAGE ─── */
-function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, timescale, setTimescale, lastRefresh }) {
-    const { data: chartData, xKey } = useTimescaledData(history, timescale);
+function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, lastRefresh, isLiveData }) {
+    const { data: chartData, xKey } = useEpochChartData(history);
 
     return (
         <>
-            <div className="cost-banner">
-                <span className="cost-icon">{Icons.dollar}</span>
-                <span><strong>Free Tier Active</strong> — S3, Lambda, CloudWatch, ECR all within AWS Free Tier. $0.00 this month.</span>
+            <div className="insights-note">
+                <span><strong>Training Overview</strong> - metrics are shown per epoch only (daily/weekly rollups removed).</span>
+                <span className="insights-note-chip">Epoch timeline only</span>
             </div>
 
-            <TimescaleBar timescale={timescale} setTimescale={setTimescale} lastRefresh={lastRefresh} />
+            <DataRefreshBar lastRefresh={lastRefresh} isLiveData={isLiveData} />
 
             <div className="metrics-row">
                 <div className="card metric-card cyan">
@@ -307,7 +269,7 @@ function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, t
             <div className="charts-row">
                 <div className="card chart-card">
                     <div className="chart-header">
-                        <div><div className="chart-title">Training Loss</div><div className="chart-subtitle">Loss convergence — {timescale === "epoch" ? "per epoch" : timescale} view</div></div>
+                        <div><div className="chart-title">Training Loss</div><div className="chart-subtitle">Loss convergence per epoch</div></div>
                         <div className="chart-legend">
                             <div className="legend-item"><div className="legend-dot" style={{ background: '#22d3ee' }} /> Train</div>
                             <div className="legend-item"><div className="legend-dot" style={{ background: '#a78bfa' }} /> Validation</div>
@@ -333,8 +295,8 @@ function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, t
 }
 
 /* ─── TRAINING PAGE ─── */
-function TrainingPage({ history, timescale, setTimescale }) {
-    const { data: chartData, xKey } = useTimescaledData(history, timescale);
+function TrainingPage({ history, lastRefresh, isLiveData }) {
+    const { data: chartData, xKey } = useEpochChartData(history);
 
     const lossLines = [{ key: "train_loss", color: "#22d3ee", name: "Train" }, { key: "val_loss", color: "#a78bfa", name: "Val" }];
     const accLines = [{ key: "train_acc", color: "#34d399", name: "Train Acc" }, { key: "val_acc", color: "#fbbf24", name: "Val Acc" }, { key: "val_f1", color: "#fb7185", name: "Val F1" }];
@@ -346,12 +308,12 @@ function TrainingPage({ history, timescale, setTimescale }) {
                 <p className="page-desc">All training runs and their performance metrics</p>
             </div>
 
-            <TimescaleBar timescale={timescale} setTimescale={setTimescale} />
+            <DataRefreshBar lastRefresh={lastRefresh} isLiveData={isLiveData} />
 
             <div className="charts-row">
                 <div className="card chart-card">
                     <div className="chart-header">
-                        <div><div className="chart-title">Loss Convergence</div><div className="chart-subtitle">{timescale === "epoch" ? "Per epoch" : timescale === "daily" ? "Daily average" : "Weekly average"}</div></div>
+                        <div><div className="chart-title">Loss Convergence</div><div className="chart-subtitle">Per epoch</div></div>
                         <div className="chart-legend">
                             {lossLines.map(l => <div key={l.key} className="legend-item"><div className="legend-dot" style={{ background: l.color }} />{l.name}</div>)}
                         </div>
@@ -360,7 +322,7 @@ function TrainingPage({ history, timescale, setTimescale }) {
                 </div>
                 <div className="card chart-card">
                     <div className="chart-header">
-                        <div><div className="chart-title">Accuracy & F1</div><div className="chart-subtitle">{timescale === "epoch" ? "Per epoch" : timescale === "daily" ? "Daily snapshots" : "Weekly snapshots"}</div></div>
+                        <div><div className="chart-title">Accuracy & F1</div><div className="chart-subtitle">Per epoch</div></div>
                         <div className="chart-legend">
                             {accLines.map(l => <div key={l.key} className="legend-item"><div className="legend-dot" style={{ background: l.color }} />{l.name}</div>)}
                         </div>
@@ -440,7 +402,7 @@ function EndpointsPage() {
 function DataPage({ pipeline }) {
     return (
         <>
-            <div className="page-header-bar"><h3>Data Pipeline</h3><p className="page-desc">Data ingestion, preprocessing, and storage on S3</p></div>
+            <div className="page-header-bar"><h3>Data Pipeline</h3><p className="page-desc">Data ingestion, preprocessing, and dataset storage</p></div>
             <div className="metrics-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                 <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Total Samples</span></div><div className="metric-value">120<span className="metric-unit">K</span></div><div className="metric-sub">AG News dataset</div></div>
                 <div className="card metric-card emerald"><div className="metric-header"><span className="metric-label">Train Split</span></div><div className="metric-value">96<span className="metric-unit">K</span></div><div className="metric-sub">80% · 27 MB</div></div>
@@ -473,7 +435,7 @@ function InfraPage() {
             <div className="page-header-bar"><h3>Infrastructure</h3><p className="page-desc">AWS resources provisioned via Terraform in us-east-1</p></div>
             <div className="metrics-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '1rem' }}>
                 <div className="card metric-card emerald"><div className="metric-header"><span className="metric-label">Resources</span></div><div className="metric-value">28</div><div className="metric-sub">Terraform managed</div></div>
-                <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Monthly Cost</span></div><div className="metric-value">$0<span className="metric-unit">.00</span></div><div className="metric-sub">Within Free Tier</div></div>
+                <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Monthly Cost</span></div><div className="metric-value">$0<span className="metric-unit">.00</span></div><div className="metric-sub">Current estimate</div></div>
                 <div className="card metric-card amber"><div className="metric-header"><span className="metric-label">Region</span></div><div className="metric-value" style={{ fontSize: '1.2rem' }}>us-east-1</div><div className="metric-sub">N. Virginia</div></div>
             </div>
             <div className="card section-card">

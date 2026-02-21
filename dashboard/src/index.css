@@ -297,69 +297,8 @@ body {
   margin-bottom: 1.75rem;
 }
 
-.config-bar .nav-pill {
-  padding: 0.4rem 0.85rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.config-bar .nav-pill:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-.config-bar .nav-pill.active {
-  background: var(--accent-cyan-dim);
-  border-color: rgba(34, 211, 238, 0.25);
-  color: var(--accent-cyan);
-}
-
 .config-bar .spacer {
   flex: 1;
-}
-
-.config-bar .period-pill {
-  padding: 0.35rem 0.7rem;
-  font-size: 0.78rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  transition: var(--transition);
-}
-
-.config-bar .period-pill:hover {
-  color: var(--text-secondary);
-}
-
-.config-bar .period-pill.active {
-  color: var(--text-primary);
-  background: var(--bg-card);
-}
-
-.filter-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  background: var(--accent-cyan);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #000;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.filter-btn:hover {
-  opacity: 0.9;
 }
 
 /* ─── Metric Cards Grid ──────────────────────── */
@@ -737,21 +676,29 @@ body {
 }
 
 /* ─── Cost Banner ────────────────────────────── */
-.cost-banner {
+.insights-note {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.6rem 1rem;
-  background: var(--accent-emerald-dim);
-  border: 1px solid rgba(52, 211, 153, 0.15);
+  padding: 0.75rem 1rem;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(167, 139, 250, 0.08));
+  border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: var(--radius);
   margin-bottom: 1.25rem;
-  font-size: 0.78rem;
-  color: var(--accent-emerald);
+  font-size: 0.8rem;
+  color: var(--text-primary);
 }
 
-.cost-banner .cost-icon {
-  font-size: 1rem;
+.insights-note-chip {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ─── Responsive ─────────────────────────────── */
@@ -934,18 +881,6 @@ body {
 }
 
 /* ─── Nav pill icon alignment ────────────────── */
-.nav-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.filter-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
 /* ─── Search icon alignment ──────────────────── */
 .search-icon {
   display: flex;
@@ -954,12 +889,6 @@ body {
 }
 
 /* ─── Cost icon alignment ────────────────────── */
-.cost-icon {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 /* ─── Metric unit ────────────────────────────── */
 .metric-unit {
   font-size: 1rem;
@@ -978,6 +907,34 @@ body {
 
 .refresh-text {
   font-variant-numeric: tabular-nums;
+}
+
+.source-chip {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.source-chip.live {
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--accent-emerald);
+}
+
+.source-chip.demo {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--accent-amber);
+}
+
+.refresh-chip {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
 }
 
 .icon-inline {
