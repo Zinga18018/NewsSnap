@@ -798,3 +798,164 @@ body {
     min-width: 180px;
   }
 }
+
+/* ─── Page Header ────────────────────────────── */
+.page-header-bar {
+  margin-bottom: 1.5rem;
+}
+
+.page-header-bar h3 {
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+
+.page-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Data Tables ────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr {
+  transition: var(--transition);
+}
+
+.data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.data-table .mono {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Status Chips ───────────────────────────── */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.status-chip.success {
+  background: var(--accent-emerald-dim);
+  color: var(--accent-emerald);
+}
+
+.status-chip.warning {
+  background: var(--accent-amber-dim);
+  color: var(--accent-amber);
+}
+
+.status-chip.error {
+  background: var(--accent-rose-dim);
+  color: var(--accent-rose);
+}
+
+.status-chip.muted {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+}
+
+/* ─── Empty State ────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+
+.empty-state h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.empty-state code {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--accent-cyan);
+}
+
+/* ─── Nav pill icon alignment ────────────────── */
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ─── Search icon alignment ──────────────────── */
+.search-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ─── Cost icon alignment ────────────────────── */
+.cost-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
