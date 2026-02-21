@@ -201,6 +201,33 @@ py -m pytest -q
 
 Latest local test run: `22 passed in 9.58s`.
 
+## Backend Deployment (API)
+### Option A: Render (recommended)
+This repo now includes `render.yaml` and `Dockerfile.api` for API deployment.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Zinga18018/NewsSnap)
+
+Or manual setup:
+1. Create new Web Service from this repo on Render.
+2. Use `Dockerfile.api`.
+3. Wait for deploy, then open:
+   - `https://<your-render-service>/health`
+4. Copy that base URL for frontend wiring.
+
+### Option B: Railway
+This repo includes `Procfile`.
+Set start command (if prompted):
+```bash
+uvicorn src.serving.api:app --host 0.0.0.0 --port $PORT
+```
+
+### Important mode note
+If no `models/latest` artifact exists on the deployed backend, API runs in `demo` mode by design.
+To verify mode:
+```bash
+curl https://<your-backend>/health
+```
+
 ## Vercel Deployment (Dashboard)
 This repository includes `vercel.json` for building the Vite app from `dashboard/`.
 

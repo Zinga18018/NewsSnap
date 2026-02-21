@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: newssnap-api
+    env: docker
+    dockerfilePath: ./Dockerfile.api
+    autoDeploy: true
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: MODEL_DIR
+        value: models/latest
