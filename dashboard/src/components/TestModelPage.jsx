@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
 
 const SAMPLE_TEXTS = [
     "Apple announces new M4 chip with revolutionary AI capabilities for MacBook Pro",
@@ -31,6 +31,12 @@ export default function TestModelPage() {
     const classify = useCallback(async (text) => {
         const trimmed = text.trim();
         if (!trimmed) return;
+
+        if (!API_URL) {
+            setError("API URL not configured. Set VITE_API_URL in Vercel project settings and redeploy.");
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setResult(null);

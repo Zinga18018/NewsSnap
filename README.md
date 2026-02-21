@@ -52,9 +52,9 @@ This repo is configured for Vercel to build the Vite app in `dashboard/` using `
 
 1. Import this GitHub repo into Vercel.
 2. Deploy (no custom build settings needed).
-3. Set `VITE_API_URL` in Vercel Project Environment Variables to your API base URL.
+3. Set `VITE_API_URL` in Vercel Project Environment Variables to your backend API base URL.
 
-Without `VITE_API_URL`, production falls back to `/api`.
+Without `VITE_API_URL`, classify requests are disabled in production.
 
 ## Optional AWS path
 AWS/SageMaker scripts and Terraform are still in the repo, but optional. You can complete the entire project locally without AWS costs.
