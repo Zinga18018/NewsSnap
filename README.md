@@ -46,6 +46,16 @@ npm run dev -- --host 127.0.0.1 --port 5173
 ```
 Open `http://127.0.0.1:5173`.
 
+## Deploy Dashboard to Vercel
+
+This repo is configured for Vercel to build the Vite app in `dashboard/` using `vercel.json`.
+
+1. Import this GitHub repo into Vercel.
+2. Deploy (no custom build settings needed).
+3. Set `VITE_API_URL` in Vercel Project Environment Variables to your API base URL.
+
+Without `VITE_API_URL`, production falls back to `/api`.
+
 ## Optional AWS path
 AWS/SageMaker scripts and Terraform are still in the repo, but optional. You can complete the entire project locally without AWS costs.
 
