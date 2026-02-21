@@ -166,10 +166,60 @@ def _real_predict(texts: List[str]) -> List[dict]:
     ]
 
 
+def _maybe_download_model_from_s3(model_path: Path) -> None:
+    """
+    Optionally download model artifacts from S3 when local model files are missing.
+
+    Enabled when:
+    - S3_BUCKET_MODELS is set
+    - and MODEL_DIR does not already contain config.json
+    """
+    if model_path.exists() and (model_path / "config.json").exists():
+        return
+
+    bucket = os.environ.get("S3_BUCKET_MODELS")
+    prefix = os.environ.get("MODEL_S3_PREFIX", "public/models/latest").strip("/")
+    region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    if not bucket:
+        return
+
+    try:
+        import boto3
+
+        logger.info("Model not found locally. Attempting S3 download from s3://%s/%s", bucket, prefix)
+        s3 = boto3.client("s3", region_name=region)
+        paginator = s3.get_paginator("list_objects_v2")
+
+        downloaded = 0
+        total_bytes = 0
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                rel = key[len(prefix):].lstrip("/")
+                if not rel:
+                    continue
+
+                destination = model_path / rel
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                s3.download_file(bucket, key, str(destination))
+                downloaded += 1
+                total_bytes += int(obj.get("Size", 0))
+
+        logger.info(
+            "Downloaded %d model artifact(s) from S3 (%d bytes) into %s",
+            downloaded,
+            total_bytes,
+            model_path,
+        )
+    except Exception as exc:
+        logger.warning("S3 model download failed: %s", exc)
+
+
 def _load_model() -> None:
     """Load model on startup with fallback to demo mode."""
     model_path = Path(MODEL_DIR)
     logger.info("Attempting to load model from %s", MODEL_DIR)
+    _maybe_download_model_from_s3(model_path)
 
     if model_path.exists() and (model_path / "config.json").exists():
         try:

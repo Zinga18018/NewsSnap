@@ -221,6 +221,26 @@ Set start command (if prompted):
 uvicorn src.serving.api:app --host 0.0.0.0 --port $PORT
 ```
 
+### Option C: Hugging Face Spaces (free tier path)
+This repo includes `Dockerfile.space` and `requirements-space.txt` for a Docker Space.
+
+1. Create a new Hugging Face Space.
+2. Select `Docker` SDK.
+3. Link your GitHub repo (or push files directly).
+4. In Space Variables/Secrets set:
+   - `MODEL_DIR=models/latest`
+   - `S3_BUCKET_MODELS=llmop-ml-models-dev`
+   - `MODEL_S3_PREFIX=public/models/latest`
+   - `AWS_ACCESS_KEY_ID=<your-key>` (Secret)
+   - `AWS_SECRET_ACCESS_KEY=<your-secret>` (Secret)
+   - `AWS_DEFAULT_REGION=us-east-1`
+5. Set Dockerfile path to `Dockerfile.space` if prompted.
+6. After build completes, test:
+   - `https://<your-space-subdomain>.hf.space/health`
+
+The API now supports optional startup download of model artifacts from S3.
+If those secrets are present, the Space can run in `real` mode automatically.
+
 ### Important mode note
 If no `models/latest` artifact exists on the deployed backend, API runs in `demo` mode by design.
 To verify mode:
