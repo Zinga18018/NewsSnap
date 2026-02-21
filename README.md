@@ -30,6 +30,26 @@ The design goal is practical research-to-product workflow: reproducible local ex
 - Dashboard with live prediction view and confidence breakdown.
 - CI/CD workflows for quality checks, ML pipeline, and Terraform automation.
 
+## Product Showcase
+
+<p align="center">
+  <a href="Images/insights-overview.png">
+    <img src="Images/insights-overview.png" alt="NewsSnap Insights Overview" width="98%" />
+  </a>
+</p>
+
+<p align="center"><strong>Insights Dashboard:</strong> epoch-focused metrics, live/demo status, and clean operational telemetry.</p>
+
+| Training Intelligence | Model Testing |
+|---|---|
+| <a href="Images/training-charts.png"><img src="Images/training-charts.png" alt="Training Loss and PR Curve" width="100%"/></a><br/><sub>Loss convergence + PR curve view</sub> | <a href="Images/test-model-input.png"><img src="Images/test-model-input.png" alt="Interactive Test Model screen" width="100%"/></a><br/><sub>Interactive headline classification UX</sub> |
+| <a href="Images/pipeline-confusion-matrix.png"><img src="Images/pipeline-confusion-matrix.png" alt="Pipeline status and confusion matrix" width="100%"/></a><br/><sub>Pipeline health + confusion matrix diagnostics</sub> | <a href="Images/data-pipeline-overview.png"><img src="Images/data-pipeline-overview.png" alt="Data pipeline overview" width="100%"/></a><br/><sub>Dataset split and processing timeline</sub> |
+
+| Infrastructure Views | Delivery & Ops |
+|---|---|
+| <a href="Images/endpoints-overview.png"><img src="Images/endpoints-overview.png" alt="Endpoints overview and pricing table" width="100%"/></a><br/><sub>Endpoint readiness and cost estimates</sub> | <a href="Images/provisioned-resources.png"><img src="Images/provisioned-resources.png" alt="Provisioned resources table" width="100%"/></a><br/><sub>AWS resource inventory and status</sub> |
+| <a href="Images/s3-storage-table.png"><img src="Images/s3-storage-table.png" alt="S3 storage table" width="100%"/></a><br/><sub>Storage state across data/model/metrics buckets</sub> | <a href="Images/settings-cicd.png"><img src="Images/settings-cicd.png" alt="Settings and CI/CD table" width="100%"/></a><br/><sub>Environment, model config, and pipeline wiring</sub> |
+
 ## Measured Results
 ### Evaluation Snapshot
 Source: `models/latest/evaluation_results.json` (timestamp `2026-02-21T04:29:44.346151`)
