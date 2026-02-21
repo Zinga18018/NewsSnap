@@ -22,10 +22,28 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY config.py .
 COPY src/ ./src/
 
-# SageMaker expects the training script at this path
+# ──────────────────────────────────────────────
+# Runtime Configuration
+# ──────────────────────────────────────────────
+# Default program for SageMaker
 ENV SAGEMAKER_PROGRAM=src/models/train.py
 
-# ──────────────────────────────────────────────
-# Default: run training
-# ──────────────────────────────────────────────
-ENTRYPOINT ["python", "-m", "src.models.train"]
+# Expose FastAPI port
+EXPOSE 8000
+
+# Entrypoint script or direct command
+# Use CMD so it can be easily overridden:
+# Training: docker run image train
+# Serving:  docker run image serve
+COPY <<EOF /usr/local/bin/entrypoint.sh
+#!/bin/bash
+if [ "$1" = "serve" ]; then
+    exec uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
+else
+    exec python -m src.models.train "$@"
+fi
+EOF
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["train"]

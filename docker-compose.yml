@@ -16,6 +16,20 @@ services:
       - SM_NUM_GPUS=0
     command: [ "python", "-m", "src.models.train" ]
 
+  # ── Inference API ────────────────────────────
+  inference:
+    build: .
+    container_name: llmops-inference
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/opt/ml/model
+      - ./src:/opt/ml/code/src
+    environment:
+      - MODEL_DIR=/opt/ml/model/latest
+    command: [ "uvicorn", "src.serving.api:app", "--host", "0.0.0.0", "--port", "8000" ]
+
   # ── LocalStack (mock AWS for local dev) ─────
   localstack:
     image: localstack/localstack:latest

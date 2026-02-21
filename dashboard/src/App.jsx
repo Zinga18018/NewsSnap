@@ -4,6 +4,7 @@ import PipelineStatus from "./components/PipelineStatus";
 import ModelCard from "./components/ModelCard";
 import ConfusionMatrix from "./components/ConfusionMatrix";
 import PRAUCChart from "./components/PRAUCChart";
+import TestModelPage from "./components/TestModelPage";
 
 /* ── SVG Icons ── */
 const Icons = {
@@ -24,6 +25,7 @@ const Icons = {
     configure: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21v-7" /><path d="M4 10V3" /><path d="M12 21v-9" /><path d="M12 8V3" /><path d="M20 21v-5" /><path d="M20 12V3" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="8" r="2" /><circle cx="20" cy="14" r="2" /></svg>,
     refresh: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M3 21v-5h5" /></svg>,
     clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+    testmodel: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>,
 };
 
 /* ── Raw epoch data → simulated daily/weekly aggregates ── */
@@ -147,6 +149,7 @@ function App() {
         { id: "training", icon: Icons.training, label: "Training Jobs" },
         { id: "models", icon: Icons.models, label: "Model Registry" },
         { id: "endpoints", icon: Icons.endpoints, label: "Endpoints" },
+        { id: "testmodel", icon: Icons.testmodel, label: "Test Model" },
         { id: "data", icon: Icons.data, label: "Data Pipeline" },
     ];
 
@@ -165,6 +168,8 @@ function App() {
                 return <ModelsPage />;
             case "endpoints":
                 return <EndpointsPage />;
+            case "testmodel":
+                return <TestModelPage />;
             case "data":
                 return <DataPage pipeline={pipeline} />;
             case "infra":
