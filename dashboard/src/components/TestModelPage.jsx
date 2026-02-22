@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 
-// Production fallback keeps the demo functional even if Vercel env vars are missed.
-const FALLBACK_PROD_API_URL = "https://6a6wrd2nrnewpurv6yvtmtqonu0elxkx.lambda-url.us-east-1.on.aws";
-const API_URL = (
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV ? "http://localhost:8000" : FALLBACK_PROD_API_URL)
-).replace(/\/$/, "");
+function normalizeApiBase(url) {
+    if (!url) return "";
+    return url.trim().replace(/\/+$/, "").replace(/\/(predict|health)$/i, "");
+}
+
+const API_URL = normalizeApiBase(
+    import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "")
+);
 
 const SAMPLE_TEXTS = [
     "Apple announces new M4 chip with revolutionary AI capabilities for MacBook Pro",
@@ -37,23 +39,24 @@ export default function TestModelPage() {
         const trimmed = text.trim();
         if (!trimmed) return;
 
-        if (!API_URL) {
-            setError("API URL not configured. Set VITE_API_URL in Vercel project settings and redeploy.");
-            return;
-        }
-
         setLoading(true);
         setError(null);
         setResult(null);
 
         try {
-            const res = await fetch(`${API_URL}/predict`, {
+            const predictUrl = API_URL ? `${API_URL}/predict` : "/predict";
+            const res = await fetch(predictUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text: trimmed }),
             });
 
             if (!res.ok) {
+                if (res.status === 405) {
+                    throw new Error(
+                        "API returned 405. Set VITE_API_URL to your backend base URL only (example: https://<your-api-domain>, not your frontend URL and not ending with /predict)."
+                    );
+                }
                 throw new Error(`API returned ${res.status}`);
             }
 
@@ -65,7 +68,11 @@ export default function TestModelPage() {
             setServerStatus(data.mode);
             lastSubmittedRef.current = trimmed;
         } catch (err) {
-            setError(err.message.includes("fetch") ? "Cannot reach API. Start the server: uvicorn src.serving.api:app --port 8000" : err.message);
+            setError(
+                err.message.includes("fetch")
+                    ? "Cannot reach API. Start backend locally with: uvicorn src.serving.api:app --port 8000, or set VITE_API_URL."
+                    : err.message
+            );
         } finally {
             setLoading(false);
         }

@@ -11,6 +11,8 @@ from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.utils.logging_config import setup_logging
@@ -23,6 +25,8 @@ LABEL_MAP = {0: "World", 1: "Sports", 2: "Business", 3: "Sci/Tech"}
 MODEL_DIR = os.environ.get("MODEL_DIR", "models/latest")
 MAX_TEXTS_PER_REQUEST = 32
 MAX_TEXT_LENGTH = 5000
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DASHBOARD_DIST_DIR = PROJECT_ROOT / "dashboard" / "dist"
 
 _model_state = {"mode": None, "artifacts": None, "loaded_at": None}
 _start_time = time.time()
@@ -322,6 +326,10 @@ async def predict(req: PredictRequest, request: Request):
 
 @app.get("/")
 def root():
+    index_file = DASHBOARD_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+
     return {
         "service": "LLMOps Inference API",
         "version": "1.0.0",
@@ -329,3 +337,23 @@ def root():
         "health": "/health",
         "predict": "POST /predict",
     }
+
+
+if (DASHBOARD_DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(DASHBOARD_DIST_DIR / "assets")), name="dashboard-assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def dashboard_spa_fallback(full_path: str):
+    if not DASHBOARD_DIST_DIR.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    requested = DASHBOARD_DIST_DIR / full_path
+    if requested.is_file():
+        return FileResponse(requested)
+
+    index_file = DASHBOARD_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    raise HTTPException(status_code=404, detail="Not found")

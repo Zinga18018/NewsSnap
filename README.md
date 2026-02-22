@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch" />
   <img src="https://img.shields.io/badge/Transformers-4.x-FFBF00?logo=huggingface&logoColor=black" alt="Transformers" />
   <img src="https://img.shields.io/badge/AWS-Optional-232F3E?logo=amazonaws&logoColor=white" alt="AWS Optional" />
-  <img src="https://img.shields.io/badge/Vercel-Frontend-black?logo=vercel&logoColor=white" alt="Vercel" />
+  <img src="https://img.shields.io/badge/Render-Free%20Web%20Service-46E3B7?logo=render&logoColor=black" alt="Render Free Web Service" />
 </p>
 
 <p align="left">
@@ -221,27 +221,28 @@ py -m pytest -q
 
 Latest local test run: `22 passed in 9.58s`.
 
-## Backend Deployment (API)
-### Option A: Render (recommended)
-This repo now includes `render.yaml` and `Dockerfile.api` for API deployment.
+## Free Deployment (Recommended)
+### Option A: Render (single URL: frontend + API)
+This repo now includes `render.yaml` and `Dockerfile.render` for full-stack deployment on one free web service.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Zinga18018/NewsSnap)
 
 Or manual setup:
 1. Create new Web Service from this repo on Render.
-2. Use `Dockerfile.api`.
+2. Use `Dockerfile.render`.
 3. Wait for deploy, then open:
    - `https://<your-render-service>/health`
-4. Copy that base URL for frontend wiring.
+4. Open `https://<your-render-service>/` for the dashboard.
+5. Classify directly (no `VITE_API_URL` needed because frontend and API share the same domain).
 
-### Option B: Railway
+### Option B: Railway (API only)
 This repo includes `Procfile`.
 Set start command (if prompted):
 ```bash
 uvicorn src.serving.api:app --host 0.0.0.0 --port $PORT
 ```
 
-### Option C: Hugging Face Spaces (free tier path)
+### Option C: Hugging Face Spaces (free tier path, API only)
 This repo includes `Dockerfile.space` and `requirements-space.txt` for a Docker Space.
 
 1. Create a new Hugging Face Space.
@@ -268,7 +269,7 @@ To verify mode:
 curl https://<your-backend>/health
 ```
 
-## Vercel Deployment (Dashboard)
+## Vercel Deployment (Dashboard, optional)
 This repository includes `vercel.json` for building the Vite app from `dashboard/`.
 
 1. Import repository into Vercel.
@@ -278,10 +279,12 @@ This repository includes `vercel.json` for building the Vite app from `dashboard
 4. Redeploy after setting env vars.
 
 ### Common Production Error
-If you see:
-`API URL not configured. Set VITE_API_URL in Vercel project settings and redeploy.`
+If you see `API returned 405`, your frontend is likely calling itself instead of your backend.
 
-That means the dashboard is deployed without `VITE_API_URL`. Add the variable, redeploy, then hard refresh.
+Set `VITE_API_URL` to the backend base URL only:
+- Correct: `https://<your-backend-domain>`
+- Incorrect: `https://<your-vercel-frontend-domain>`
+- Incorrect: `https://<your-backend-domain>/predict`
 
 ## Reproducibility Notes
 - Default label mapping is fixed (`World`, `Sports`, `Business`, `Sci/Tech`).
