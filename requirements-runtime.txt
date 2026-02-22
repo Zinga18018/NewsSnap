@@ -1,0 +1,8 @@
+# Runtime dependencies for deployed API/dashboard service
+# Keeps Render builds fast by excluding training, testing, and dev-only packages.
+
+boto3>=1.34.0
+transformers>=4.36.0
+torch>=2.1.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.25.0

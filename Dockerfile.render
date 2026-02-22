@@ -2,8 +2,8 @@ FROM node:20-alpine AS dashboard-builder
 
 WORKDIR /build/dashboard
 
-COPY dashboard/package.json ./
-RUN npm install --no-audit --no-fund
+COPY dashboard/package.json dashboard/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY dashboard/ ./
 RUN npm run build
@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements-runtime.txt ./
+RUN pip install --upgrade pip && pip install --prefer-binary -r requirements-runtime.txt
 
 COPY config.py ./
 COPY src ./src

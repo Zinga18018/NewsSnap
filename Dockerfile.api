@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements-runtime.txt ./
+RUN pip install --upgrade pip && pip install --prefer-binary -r requirements-runtime.txt
 
 COPY config.py ./
 COPY src ./src
@@ -21,4 +21,3 @@ EXPOSE 8000
 
 # Render/Railway inject PORT dynamically.
 CMD ["sh", "-c", "uvicorn src.serving.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
-
