@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+// Production fallback keeps the demo functional even if Vercel env vars are missed.
+const FALLBACK_PROD_API_URL = "https://6a6wrd2nrnewpurv6yvtmtqonu0elxkx.lambda-url.us-east-1.on.aws";
+const API_URL = (
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.DEV ? "http://localhost:8000" : FALLBACK_PROD_API_URL)
+).replace(/\/$/, "");
 
 const SAMPLE_TEXTS = [
     "Apple announces new M4 chip with revolutionary AI capabilities for MacBook Pro",

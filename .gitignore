@@ -47,3 +47,8 @@ data/processed/
 *.pt
 *.bin
 *.h5
+
+# Generated deployment artifacts
+artifacts/
+sagemaker_deploy.json
+sagemaker_proxy_url.json
