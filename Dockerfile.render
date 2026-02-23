@@ -26,6 +26,8 @@ RUN pip install --upgrade pip && pip install --prefer-binary -r requirements-run
 
 COPY config.py ./
 COPY src ./src
+COPY models/latest/evaluation_results.json ./models/latest/evaluation_results.json
+COPY models/latest/training_history.json ./models/latest/training_history.json
 COPY --from=dashboard-builder /build/dashboard/dist ./dashboard/dist
 
 EXPOSE 8000

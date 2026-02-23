@@ -79,7 +79,7 @@ const DEMO_PIPELINE = [
     { name: "Endpoint Deploy", status: "pending", time: "—" },
 ];
 
-const METRICS_URL = import.meta.env.VITE_METRICS_URL || null;
+const METRICS_URL = (import.meta.env.VITE_METRICS_URL || "/metrics").replace(/\/$/, "");
 
 function App() {
     const [metrics, setMetrics] = useState(DEMO_METRICS);
@@ -90,6 +90,7 @@ function App() {
     const [pipeline, setPipeline] = useState(DEMO_PIPELINE);
     const [activeNav, setActiveNav] = useState("insights");
     const [lastRefresh, setLastRefresh] = useState(new Date());
+    const [hasLiveMetrics, setHasLiveMetrics] = useState(false);
 
     useEffect(() => {
         if (!METRICS_URL) return;
@@ -99,19 +100,24 @@ function App() {
                     fetch(`${METRICS_URL}/latest_evaluation.json`),
                     fetch(`${METRICS_URL}/latest_metrics.json`),
                 ]);
+                let loadedLiveMetrics = false;
                 if (evalRes.ok) {
                     const evalData = await evalRes.json();
                     setMetrics(evalData.metrics);
                     if (evalData.confusion_matrix) setConfusion(evalData.confusion_matrix);
                     if (evalData.label_names) setLabels(evalData.label_names);
                     if (evalData.pr_curve) setPrData(evalData.pr_curve);
+                    loadedLiveMetrics = true;
                 }
                 if (histRes.ok) {
                     const histData = await histRes.json();
                     if (histData.metrics) setHistory(histData.metrics);
+                    loadedLiveMetrics = true;
                 }
+                setHasLiveMetrics(loadedLiveMetrics);
                 setLastRefresh(new Date());
             } catch (err) {
+                setHasLiveMetrics(false);
                 console.log("Using demo data:", err.message);
             }
         };
@@ -137,9 +143,9 @@ function App() {
     const renderPageContent = () => {
         switch (activeNav) {
             case "insights":
-                return <InsightsPage metrics={metrics} history={history} prData={prData} confusion={confusion} labels={labels} pipeline={pipeline} lastRefresh={lastRefresh} isLiveData={Boolean(METRICS_URL)} />;
+                return <InsightsPage metrics={metrics} history={history} prData={prData} confusion={confusion} labels={labels} pipeline={pipeline} lastRefresh={lastRefresh} isLiveData={hasLiveMetrics} />;
             case "training":
-                return <TrainingPage history={history} lastRefresh={lastRefresh} isLiveData={Boolean(METRICS_URL)} />;
+                return <TrainingPage history={history} lastRefresh={lastRefresh} isLiveData={hasLiveMetrics} />;
             case "models":
                 return <ModelsPage />;
             case "endpoints":

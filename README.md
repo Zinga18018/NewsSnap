@@ -32,6 +32,8 @@
 </p>
 
 > Free Render note: first load/prediction after idle can take longer due cold start. Once awake, responses are much faster.
+>
+> Public demo behavior: the hosted Render app may run **demo inference mode** (to avoid shipping large model weights on free hosting), but it can still display **real training/evaluation metrics** sourced from saved artifacts.
 
 ## Abstract
 NewsSnap is an end-to-end MLOps implementation for AG News classification into four classes: `World`, `Sports`, `Business`, and `Sci/Tech`.
@@ -228,6 +230,36 @@ Response (shape):
   "model_dir": "models/latest"
 }
 ```
+
+## Why You May See Demo Mode
+`Demo Mode` on the Test Model page means the backend could not load `models/latest` model weights and fell back to the built-in heuristic classifier.
+
+Common reasons:
+- Free/cloud deployment does not include the large model artifact (`model.safetensors`).
+- The backend has no S3 model download configuration.
+- The model failed to load due memory/startup constraints.
+
+How to verify:
+```bash
+curl https://<your-app>/health
+```
+If it returns `"mode":"demo"`, inference is fallback mode.
+
+### Run Real Inference Locally (Free)
+If your local `models/latest/` folder exists, the same app can run real inference from your laptop:
+```bash
+npm run build --prefix dashboard
+py -m uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
+curl http://127.0.0.1:8000/health
+```
+Expected: `"mode":"real"`
+
+### Metrics Endpoints (actual saved metrics)
+The backend exposes saved experiment metrics (if present):
+- `GET /metrics/latest_evaluation.json`
+- `GET /metrics/latest_metrics.json`
+
+The dashboard reads these endpoints by default and falls back to demo metrics only if they are unavailable.
 
 ## Testing and Quality
 Run test suite:

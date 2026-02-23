@@ -12,6 +12,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -27,6 +28,7 @@ MAX_TEXTS_PER_REQUEST = 32
 MAX_TEXT_LENGTH = 5000
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIST_DIR = PROJECT_ROOT / "dashboard" / "dist"
+METRICS_DIR = PROJECT_ROOT / "models" / "latest"
 
 _model_state = {"mode": None, "artifacts": None, "loaded_at": None}
 _start_time = time.time()
@@ -276,6 +278,30 @@ def health():
         "model_dir": MODEL_DIR if _model_state["mode"] == "real" else None,
         "uptime_seconds": round(time.time() - _start_time, 1),
     }
+
+
+def _load_json_file(path: Path):
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Metrics file not found: {path.name}")
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        logger.warning("Failed reading JSON file %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail=f"Failed to read {path.name}")
+
+
+@app.get("/metrics/latest_evaluation.json")
+def latest_evaluation():
+    return JSONResponse(content=_load_json_file(METRICS_DIR / "evaluation_results.json"))
+
+
+@app.get("/metrics/latest_metrics.json")
+def latest_metrics():
+    history = _load_json_file(METRICS_DIR / "training_history.json")
+    if isinstance(history, list):
+        return JSONResponse(content={"metrics": history})
+    return JSONResponse(content=history)
 
 
 @app.post("/predict", response_model=PredictResponse)
