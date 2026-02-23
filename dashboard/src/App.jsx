@@ -215,7 +215,7 @@ function DataRefreshBar({ lastRefresh, isLiveData }) {
             </div>
             <div className="spacer" />
             <span className={`source-chip ${isLiveData ? "live" : "demo"}`}>
-                {isLiveData ? "Live metrics" : "Demo metrics"}
+                {isLiveData ? "Live metrics source" : "Demo metrics (sample)"}
             </span>
             <span className="refresh-chip">Per-epoch view</span>
             <button className="refresh-btn" onClick={() => window.location.reload()} title="Refresh data">
@@ -242,6 +242,15 @@ function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, l
             </div>
 
             <DataRefreshBar lastRefresh={lastRefresh} isLiveData={isLiveData} />
+
+            {!isLiveData && (
+                <div className="metrics-source-banner demo">
+                    <strong>Demo metrics are displayed.</strong>
+                    <span>
+                        This page is using sample training charts and KPI values for portfolio preview. Wire `VITE_METRICS_URL` to a metrics endpoint/object store to show live metrics.
+                    </span>
+                </div>
+            )}
 
             <div className="metrics-row">
                 <div className="card metric-card cyan">

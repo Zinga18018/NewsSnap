@@ -35,6 +35,27 @@ export default function TestModelPage() {
     const [realtime, setRealtime] = useState(true);
     const lastSubmittedRef = useRef("");
 
+    useEffect(() => {
+        let active = true;
+
+        const checkHealth = async () => {
+            try {
+                const healthUrl = API_URL ? `${API_URL}/health` : "/health";
+                const res = await fetch(healthUrl);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (active && data?.mode) {
+                    setServerStatus(data.mode);
+                }
+            } catch {
+                // Silent: the classify action will surface actionable API errors.
+            }
+        };
+
+        checkHealth();
+        return () => { active = false; };
+    }, []);
+
     const classify = useCallback(async (text) => {
         const trimmed = text.trim();
         if (!trimmed) return;
@@ -95,6 +116,8 @@ export default function TestModelPage() {
         classify(text);
     };
 
+    const modeBadgeText = serverStatus === "real" ? "Live Model" : serverStatus === "demo" ? "Public Demo" : null;
+
     return (
         <div className="test-model-page">
             <div className="page-header-bar">
@@ -103,11 +126,24 @@ export default function TestModelPage() {
                     Classify news articles into World, Sports, Business, or Sci/Tech
                     {serverStatus && (
                         <span className={`mode-badge ${serverStatus}`}>
-                            {serverStatus === "real" ? "Live Model" : "Demo Mode"}
+                            {modeBadgeText}
                         </span>
                     )}
                 </p>
             </div>
+
+            {serverStatus && (
+                <div className={`model-status-banner ${serverStatus}`}>
+                    <strong>
+                        {serverStatus === "real" ? "Live model inference is active." : "Public demo fallback is active."}
+                    </strong>
+                    <span>
+                        {serverStatus === "real"
+                            ? "Predictions are computed by the deployed DistilBERT backend."
+                            : "Predictions use a lightweight heuristic because the trained model is not loaded on this public deployment."}
+                    </span>
+                </div>
+            )}
 
             {/* Input Section */}
             <div className="card section-card test-input-section">
@@ -206,6 +242,11 @@ export default function TestModelPage() {
                         <span className="model-tag">{result.model}</span>
                         <span className="mode-tag">{result.mode} mode</span>
                     </div>
+                    {result.mode === "demo" && (
+                        <div className="result-mode-explainer">
+                            Demo mode uses a keyword-based fallback for public preview. Run locally or connect SageMaker/hosted model compute for real inference.
+                        </div>
+                    )}
                 </div>
             )}
 
