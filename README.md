@@ -17,6 +17,22 @@
   <img src="https://img.shields.io/github/actions/workflow/status/Zinga18018/NewsSnap/terraform.yml?branch=master&label=Terraform" alt="Terraform" />
 </p>
 
+## Live Demo
+
+<p align="left">
+  <a href="https://newssnap.onrender.com/" target="_blank">
+    <img src="https://img.shields.io/badge/Open-Live%20App-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Open Live App" />
+  </a>
+  <a href="https://newssnap.onrender.com/health" target="_blank">
+    <img src="https://img.shields.io/badge/API-Health%20Check-0EA5E9?style=for-the-badge&logo=fastapi&logoColor=white" alt="API Health Check" />
+  </a>
+  <a href="https://newssnap.onrender.com/docs" target="_blank">
+    <img src="https://img.shields.io/badge/OpenAPI-Docs-10B981?style=for-the-badge&logo=swagger&logoColor=white" alt="OpenAPI Docs" />
+  </a>
+</p>
+
+> Free Render note: first load/prediction after idle can take longer due cold start. Once awake, responses are much faster.
+
 ## Abstract
 NewsSnap is an end-to-end MLOps implementation for AG News classification into four classes: `World`, `Sports`, `Business`, and `Sci/Tech`.
 It includes local-first training and evaluation, a production-style FastAPI inference service with validation and rate limiting, and an interactive React dashboard for real-time testing.
