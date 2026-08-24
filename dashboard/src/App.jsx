@@ -29,16 +29,14 @@ const Icons = {
 };
 
 const DEMO_METRICS = {
-    accuracy: 0.9142,
-    f1_weighted: 0.9138,
-    f1_macro: 0.9131,
-    mcc: 0.8856,
+    accuracy: 0.8699,
+    f1_weighted: 0.8692,
+    f1_macro: 0.8692,
+    mcc: 0.8270,
 };
 
 const DEMO_HISTORY = [
-    { epoch: 1, train_loss: 0.42, train_acc: 0.852, val_loss: 0.31, val_acc: 0.889, val_f1: 0.888 },
-    { epoch: 2, train_loss: 0.22, train_acc: 0.921, val_loss: 0.25, val_acc: 0.908, val_f1: 0.908 },
-    { epoch: 3, train_loss: 0.14, train_acc: 0.953, val_loss: 0.24, val_acc: 0.914, val_f1: 0.914 },
+    { epoch: 1, train_loss: 1.1816, train_acc: 0.6582, val_loss: 0.9204, val_acc: 0.9141, val_f1: 0.9135 },
 ];
 
 const DEMO_PR_DATA = [
@@ -221,7 +219,7 @@ function DataRefreshBar({ lastRefresh, isLiveData }) {
             </div>
             <div className="spacer" />
             <span className={`source-chip ${isLiveData ? "live" : "demo"}`}>
-                {isLiveData ? "Live metrics source" : "Demo metrics (sample)"}
+                {isLiveData ? "Live metrics source" : "Verified artifact snapshot"}
             </span>
             <span className="refresh-chip">Per-epoch view</span>
             <button className="refresh-btn" onClick={() => window.location.reload()} title="Refresh data">
@@ -251,31 +249,31 @@ function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, l
 
             {!isLiveData && (
                 <div className="metrics-source-banner demo">
-                    <strong>Demo metrics are displayed.</strong>
+                    <strong>Verified static metrics are displayed.</strong>
                     <span>
-                        This page is using sample training charts and KPI values for portfolio preview. Wire `VITE_METRICS_URL` to a metrics endpoint/object store to show live metrics.
+                        KPI values and the one checked-in training epoch match the measured-results table in the repository. Connect `VITE_METRICS_URL` only when a live artifact source is available.
                     </span>
                 </div>
             )}
 
             <div className="metrics-row">
                 <div className="card metric-card cyan">
-                    <div className="metric-header"><span className="metric-label">Accuracy</span><span className="metric-badge up">+2.1%</span></div>
+                    <div className="metric-header"><span className="metric-label">Accuracy</span><span className="metric-badge up">Held out</span></div>
                     <div className="metric-value">{(metrics.accuracy * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">Best in last 3 epochs</div>
+                    <div className="metric-sub">12,000 test articles</div>
                 </div>
                 <div className="card metric-card emerald">
-                    <div className="metric-header"><span className="metric-label">F1 Weighted</span><span className="metric-badge up">+1.8%</span></div>
+                    <div className="metric-header"><span className="metric-label">F1 Weighted</span><span className="metric-badge up">Verified</span></div>
                     <div className="metric-value">{(metrics.f1_weighted * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">Target met</div>
+                    <div className="metric-sub">Evaluation artifact</div>
                 </div>
                 <div className="card metric-card amber">
-                    <div className="metric-header"><span className="metric-label">F1 Macro</span><span className="metric-badge up">+1.5%</span></div>
+                    <div className="metric-header"><span className="metric-label">F1 Macro</span><span className="metric-badge up">Verified</span></div>
                     <div className="metric-value">{(metrics.f1_macro * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">Balanced across classes</div>
+                    <div className="metric-sub">Four-class average</div>
                 </div>
                 <div className="card metric-card violet">
-                    <div className="metric-header"><span className="metric-label">MCC Score</span><span className="metric-badge up">Strong</span></div>
+                    <div className="metric-header"><span className="metric-label">MCC Score</span><span className="metric-badge up">Verified</span></div>
                     <div className="metric-value">{metrics.mcc.toFixed(3)}</div>
                     <div className="metric-sub">Matthews Correlation Coefficient</div>
                 </div>
@@ -292,18 +290,27 @@ function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, l
                     </div>
                     <MetricsChart data={chartData} lines={[{ key: "train_loss", color: "#22d3ee", name: "Train Loss" }, { key: "val_loss", color: "#a78bfa", name: "Val Loss" }]} xKey={xKey} areaFill />
                 </div>
-                <div className="card chart-card">
-                    <div className="chart-header">
-                        <div><div className="chart-title">Precision-Recall Curve</div><div className="chart-subtitle">PR AUC = 0.961 · weighted average across 4 classes</div></div>
+                {isLiveData ? (
+                    <div className="card chart-card">
+                        <div className="chart-header"><div><div className="chart-title">Precision-Recall Curve</div><div className="chart-subtitle">Loaded from the configured metrics source</div></div></div>
+                        <PRAUCChart data={prData} />
                     </div>
-                    <PRAUCChart data={prData} />
-                </div>
+                ) : (
+                    <div className="card chart-card">
+                        <div className="chart-header"><div><div className="chart-title">Precision-Recall Curve</div><div className="chart-subtitle">Not present in the checked-in public evaluation snapshot</div></div></div>
+                        <div className="empty-state"><h4>No curve data claimed</h4><p>The dashboard avoids drawing a synthetic PR curve when only scalar evaluation metrics are verified.</p></div>
+                    </div>
+                )}
             </div>
 
             <div className="bottom-row">
                 <div className="card section-card"><div className="section-title">Pipeline Status</div><PipelineStatus steps={pipeline} /></div>
                 <div className="card section-card"><div className="section-title">Model Information</div><ModelCard /></div>
-                <div className="card section-card"><div className="section-title">Confusion Matrix</div><ConfusionMatrix matrix={confusion} labels={labels} /></div>
+                {isLiveData ? (
+                    <div className="card section-card"><div className="section-title">Confusion Matrix</div><ConfusionMatrix matrix={confusion} labels={labels} /></div>
+                ) : (
+                    <div className="card section-card"><div className="section-title">Confusion Matrix</div><div className="empty-state"><h4>Artifact not published</h4><p>Class-wise precision, recall, F1, and support remain available in the repository.</p></div></div>
+                )}
             </div>
         </>
     );

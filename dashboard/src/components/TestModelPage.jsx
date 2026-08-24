@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { browserDemoPrediction } from "../demoClassifier";
 
 function normalizeApiBase(url) {
     if (!url) return "";
@@ -31,11 +32,16 @@ export default function TestModelPage() {
     const [result, setResult] = useState(null);
     const [history, setHistory] = useState([]);
     const [error, setError] = useState(null);
+    const [fallbackNote, setFallbackNote] = useState(null);
     const [serverStatus, setServerStatus] = useState(null);
     const [realtime, setRealtime] = useState(true);
     const lastSubmittedRef = useRef("");
 
     useEffect(() => {
+        if (!API_URL) {
+            setServerStatus("demo");
+            return undefined;
+        }
         let active = true;
 
         const checkHealth = async () => {
@@ -62,9 +68,24 @@ export default function TestModelPage() {
 
         setLoading(true);
         setError(null);
+        setFallbackNote(null);
         setResult(null);
 
+        const useBrowserFallback = (reason = null) => {
+            const pred = browserDemoPrediction(trimmed);
+            const newResult = { ...pred, timestamp: new Date() };
+            setResult(newResult);
+            setHistory((h) => [newResult, ...h].slice(0, 10));
+            setServerStatus("demo");
+            setFallbackNote(reason);
+            lastSubmittedRef.current = trimmed;
+        };
+
         try {
+            if (!API_URL) {
+                useBrowserFallback();
+                return;
+            }
             const predictUrl = API_URL ? `${API_URL}/predict` : "/predict";
             const res = await fetch(predictUrl, {
                 method: "POST",
@@ -89,11 +110,7 @@ export default function TestModelPage() {
             setServerStatus(data.mode);
             lastSubmittedRef.current = trimmed;
         } catch (err) {
-            setError(
-                err.message.includes("fetch")
-                    ? "Cannot reach API. Start backend locally with: uvicorn src.serving.api:app --port 8000, or set VITE_API_URL."
-                    : err.message
-            );
+            useBrowserFallback("The configured model API could not be reached, so this result uses the transparent browser fallback.");
         } finally {
             setLoading(false);
         }
@@ -202,6 +219,12 @@ export default function TestModelPage() {
                 </div>
             )}
 
+            {fallbackNote && (
+                <div className="model-status-banner demo">
+                    <strong>Backend unavailable.</strong><span>{fallbackNote}</span>
+                </div>
+            )}
+
             {/* Result */}
             {result && (
                 <div className="predict-result-card card" style={{ borderColor: LABEL_COLORS[result.label]?.border }}>
@@ -244,7 +267,7 @@ export default function TestModelPage() {
                     </div>
                     {result.mode === "demo" && (
                         <div className="result-mode-explainer">
-                            Demo mode uses a keyword-based fallback for public preview. Run locally or connect SageMaker/hosted model compute for real inference.
+                            Demo mode uses a transparent keyword-based fallback for the public interface. The displayed score shares are not DistilBERT confidence values. Run locally or connect a hosted model API for real inference.
                         </div>
                     )}
                 </div>
