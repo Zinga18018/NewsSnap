@@ -96,7 +96,6 @@ def heuristic_prediction(text: str) -> dict[str, Any]:
 
 st.set_page_config(
     page_title="NewsSnap | Transformer News Classifier",
-    page_icon="🗞️",
     layout="wide",
 )
 
