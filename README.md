@@ -20,8 +20,14 @@
 ## Live Demo
 
 <p align="left">
+  <a href="https://news-snap-three.vercel.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Vercel-Open%20MLOps%20Dashboard-111827?style=for-the-badge&logo=vercel&logoColor=white" alt="Open MLOps Dashboard" />
+  </a>
+  <a href="https://yogesh-newssnap-classifier.streamlit.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Streamlit-Try%20Classifier-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Try News Classifier" />
+  </a>
   <a href="https://newssnap.onrender.com/" target="_blank">
-    <img src="https://img.shields.io/badge/Open-Live%20App-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Open Live App" />
+    <img src="https://img.shields.io/badge/Render-Open%20API-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Open API" />
   </a>
   <a href="https://newssnap.onrender.com/health" target="_blank">
     <img src="https://img.shields.io/badge/API-Health%20Check-0EA5E9?style=for-the-badge&logo=fastapi&logoColor=white" alt="API Health Check" />

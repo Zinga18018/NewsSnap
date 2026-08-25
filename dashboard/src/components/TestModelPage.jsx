@@ -7,7 +7,8 @@ function normalizeApiBase(url) {
 }
 
 const API_URL = normalizeApiBase(
-    import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "")
+    import.meta.env.VITE_API_URL
+        || (import.meta.env.DEV ? "http://localhost:8000" : "https://newssnap.onrender.com")
 );
 
 const SAMPLE_TEXTS = [
