@@ -198,76 +198,10 @@ body {
   letter-spacing: -0.01em;
 }
 
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.45rem 0.85rem;
-  min-width: 260px;
-  transition: var(--transition);
-}
-
-.search-box:focus-within {
-  border-color: var(--border-hover);
-  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.08);
-}
-
-.search-box .search-icon {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.search-box input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: var(--font);
-  font-size: 0.85rem;
-  width: 100%;
-}
-
-.search-box input::placeholder {
-  color: var(--text-muted);
-}
-
-.search-kbd {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-family: var(--font);
-}
-
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.topbar-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  transition: var(--transition);
-}
-
-.topbar-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-primary);
 }
 
 .avatar {
@@ -741,9 +675,6 @@ body {
     padding: 0.75rem 1rem;
   }
 
-  .search-box {
-    min-width: 180px;
-  }
 }
 
 /* ─── Page Header ────────────────────────────── */
@@ -880,15 +811,6 @@ body {
   color: var(--accent-cyan);
 }
 
-/* ─── Nav pill icon alignment ────────────────── */
-/* ─── Search icon alignment ──────────────────── */
-.search-icon {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-/* ─── Cost icon alignment ────────────────────── */
 /* ─── Metric unit ────────────────────────────── */
 .metric-unit {
   font-size: 1rem;

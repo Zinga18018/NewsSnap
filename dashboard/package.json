@@ -1,12 +1,13 @@
 {
-  "name": "llmops-dashboard",
+  "name": "newssnap-dashboard",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/api/*.test.js"
   },
   "dependencies": {
     "react": "^18.2.0",

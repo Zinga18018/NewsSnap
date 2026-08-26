@@ -1,57 +1,25 @@
-# NewsSnap: LLMOps AG News Classification Platform
+# NewsSnap: Transformer News Classification
 
-<p align="left">
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/FastAPI-0.109-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/React-18-20232A?logo=react&logoColor=61DAFB" alt="React" />
-  <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/Transformers-4.x-FFBF00?logo=huggingface&logoColor=black" alt="Transformers" />
-  <img src="https://img.shields.io/badge/AWS-Optional-232F3E?logo=amazonaws&logoColor=white" alt="AWS Optional" />
-  <img src="https://img.shields.io/badge/Render-Free%20Web%20Service-46E3B7?logo=render&logoColor=black" alt="Render Free Web Service" />
-</p>
-
-<p align="left">
-  <img src="https://img.shields.io/github/actions/workflow/status/Zinga18018/NewsSnap/ci.yml?branch=master&label=CI" alt="CI" />
-  <img src="https://img.shields.io/github/actions/workflow/status/Zinga18018/NewsSnap/ml-pipeline.yml?branch=master&label=ML%20Pipeline" alt="ML Pipeline" />
-  <img src="https://img.shields.io/github/actions/workflow/status/Zinga18018/NewsSnap/terraform.yml?branch=master&label=Terraform" alt="Terraform" />
-</p>
+NewsSnap classifies AG News articles into `World`, `Sports`, `Business`, or
+`Sci/Tech`. The repository contains a reproducible DistilBERT training pipeline,
+saved evaluation artifacts, a FastAPI inference service, and two clients: a
+small Streamlit demo and a React diagnostics dashboard.
 
 ## Live Demo
 
-<p align="left">
-  <a href="https://news-snap-three.vercel.app/" target="_blank">
-    <img src="https://img.shields.io/badge/Vercel-Open%20MLOps%20Dashboard-111827?style=for-the-badge&logo=vercel&logoColor=white" alt="Open MLOps Dashboard" />
-  </a>
-  <a href="https://yogesh-newssnap-classifier.streamlit.app/" target="_blank">
-    <img src="https://img.shields.io/badge/Streamlit-Try%20Classifier-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Try News Classifier" />
-  </a>
-  <a href="https://newssnap.onrender.com/" target="_blank">
-    <img src="https://img.shields.io/badge/Render-Open%20API-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Open API" />
-  </a>
-  <a href="https://newssnap.onrender.com/health" target="_blank">
-    <img src="https://img.shields.io/badge/API-Health%20Check-0EA5E9?style=for-the-badge&logo=fastapi&logoColor=white" alt="API Health Check" />
-  </a>
-  <a href="https://newssnap.onrender.com/docs" target="_blank">
-    <img src="https://img.shields.io/badge/OpenAPI-Docs-10B981?style=for-the-badge&logo=swagger&logoColor=white" alt="OpenAPI Docs" />
-  </a>
-</p>
+[Open the Streamlit classifier](https://yogesh-newssnap-classifier.streamlit.app/)
 
-> Free Render note: first load/prediction after idle can take longer due cold start. Once awake, responses are much faster.
->
-> Public demo behavior: the hosted Render app may run **demo inference mode** (to avoid shipping large model weights on free hosting), but it can still display **real training/evaluation metrics** sourced from saved artifacts.
-
-## Abstract
-NewsSnap is an end-to-end MLOps implementation for AG News classification into four classes: `World`, `Sports`, `Business`, and `Sci/Tech`.
-It includes local-first training and evaluation, a production-style FastAPI inference service with validation and rate limiting, and an interactive React dashboard for real-time testing.
-
-The design goal is practical research-to-product workflow: reproducible local experiments first, with optional AWS/SageMaker/Terraform paths for cloud deployment.
+The demo states whether a result came from the trained model API or the
+deterministic keyword fallback. The fallback is never reported as DistilBERT.
+The Render API can take time to wake after inactivity.
 
 ## Highlights
 - Local pipeline: ingestion -> preprocessing -> training -> evaluation.
 - DistilBERT text classifier with reproducible configuration (`config.py`).
 - FastAPI inference with schema validation and request throttling.
-- Dashboard with live prediction view and confidence breakdown.
+- Streamlit classifier plus a React diagnostics dashboard.
+- Dashboard requests have cancellation, a bounded timeout, and response-shape
+  validation so a sleeping backend cannot leave the interface stuck.
 - CI/CD workflows for quality checks, ML pipeline, and Terraform automation.
 
 ## Product Showcase
@@ -268,77 +236,32 @@ The backend exposes saved experiment metrics (if present):
 The dashboard reads these endpoints by default and falls back to demo metrics only if they are unavailable.
 
 ## Testing and Quality
-Run test suite:
+Run the Python suite:
 ```bash
 py -m pytest -q
 ```
 
-Latest local test run: `22 passed in 9.58s`.
+Run the dashboard API-client tests and production build:
 
-## Free Deployment (Recommended)
-### Option A: Render (single URL: frontend + API)
-This repo now includes `render.yaml` and `Dockerfile.render` for full-stack deployment on one free web service.
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Zinga18018/NewsSnap)
-
-Or manual setup:
-1. Create new Web Service from this repo on Render.
-2. Use `Dockerfile.render`.
-3. Wait for deploy, then open:
-   - `https://<your-render-service>/health`
-4. Open `https://<your-render-service>/` for the dashboard.
-5. Classify directly (no `VITE_API_URL` needed because frontend and API share the same domain).
-
-### Option B: Railway (API only)
-This repo includes `Procfile`.
-Set start command (if prompted):
 ```bash
-uvicorn src.serving.api:app --host 0.0.0.0 --port $PORT
+cd dashboard
+npm test
+npm run build
 ```
 
-### Option C: Hugging Face Spaces (free tier path, API only)
-This repo includes `Dockerfile.space` and `requirements-space.txt` for a Docker Space.
+## Deployment notes
 
-1. Create a new Hugging Face Space.
-2. Select `Docker` SDK.
-3. Link your GitHub repo (or push files directly).
-4. In Space Variables/Secrets set:
-   - `MODEL_DIR=models/latest`
-   - `S3_BUCKET_MODELS=llmop-ml-models-dev`
-   - `MODEL_S3_PREFIX=public/models/latest`
-   - `AWS_ACCESS_KEY_ID=<your-key>` (Secret)
-   - `AWS_SECRET_ACCESS_KEY=<your-secret>` (Secret)
-   - `AWS_DEFAULT_REGION=us-east-1`
-5. Set Dockerfile path to `Dockerfile.space` if prompted.
-6. After build completes, test:
-   - `https://<your-space-subdomain>.hf.space/health`
+- `streamlit_demo/` is the public demo and is deployed on Streamlit Community
+  Cloud.
+- `render.yaml` and `Dockerfile.render` describe the hosted FastAPI service.
+- `Dockerfile.space` supports an optional Hugging Face Space.
+- `terraform/` contains the optional AWS training path; local training does not
+  require AWS.
 
-The API now supports optional startup download of model artifacts from S3.
-If those secrets are present, the Space can run in `real` mode automatically.
-
-### Important mode note
-If no `models/latest` artifact exists on the deployed backend, API runs in `demo` mode by design.
-To verify mode:
-```bash
-curl https://<your-backend>/health
-```
-
-## Vercel Deployment (Dashboard, optional)
-This repository includes `vercel.json` for building the Vite app from `dashboard/`.
-
-1. Import repository into Vercel.
-2. Deploy.
-3. In Project Settings -> Environment Variables, set:
-   - `VITE_API_URL` = your backend base URL (example: `https://your-api-domain.com`)
-4. Redeploy after setting env vars.
-
-### Common Production Error
-If you see `API returned 405`, your frontend is likely calling itself instead of your backend.
-
-Set `VITE_API_URL` to the backend base URL only:
-- Correct: `https://<your-backend-domain>`
-- Incorrect: `https://<your-vercel-frontend-domain>`
-- Incorrect: `https://<your-backend-domain>/predict`
+If a deployed backend does not contain `models/latest`, the API reports
+`"mode":"demo"`. Check `/health` before presenting a hosted prediction as model
+inference. `VITE_API_URL`, when used, must be the backend base URL and must not
+end in `/predict`.
 
 ## Reproducibility Notes
 - Default label mapping is fixed (`World`, `Sports`, `Business`, `Sci/Tech`).
@@ -349,12 +272,6 @@ Set `VITE_API_URL` to the backend base URL only:
 ## Optional AWS Path
 AWS resources (S3, SageMaker, Terraform) are optional.
 You can run training, evaluation, API, and dashboard fully local without cloud spend.
-
-## Roadmap
-- Add experiment tracking (MLflow or W&B).
-- Add model calibration and thresholding analysis.
-- Add quantization/distillation variants for lower-latency inference.
-- Add online drift monitoring and alerting.
 
 ## Acknowledgments
 - AG News dataset (HuggingFace Datasets)

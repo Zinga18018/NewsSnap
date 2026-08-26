@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { browserDemoPrediction } from "../demoClassifier";
-
-function normalizeApiBase(url) {
-    if (!url) return "";
-    return url.trim().replace(/\/+$/, "").replace(/\/(predict|health)$/i, "");
-}
+import {
+    NewsApiError,
+    checkApiHealth,
+    normalizeApiBase,
+    requestPrediction,
+} from "../api/newsApi";
 
 const API_URL = normalizeApiBase(
     import.meta.env.DEV
@@ -33,43 +34,48 @@ export default function TestModelPage() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [history, setHistory] = useState([]);
-    const [error, setError] = useState(null);
     const [fallbackNote, setFallbackNote] = useState(null);
     const [serverStatus, setServerStatus] = useState(null);
     const [realtime, setRealtime] = useState(true);
     const lastSubmittedRef = useRef("");
+    const activeRequestRef = useRef({ id: 0, controller: null });
 
     useEffect(() => {
         if (!API_URL) {
             setServerStatus("demo");
             return undefined;
         }
-        let active = true;
+        const controller = new AbortController();
 
         const checkHealth = async () => {
             try {
-                const healthUrl = API_URL ? `${API_URL}/health` : "/health";
-                const res = await fetch(healthUrl);
-                if (!res.ok) return;
-                const data = await res.json();
-                if (active && data?.mode) {
-                    setServerStatus(data.mode);
-                }
+                const mode = await checkApiHealth(API_URL, {
+                    signal: controller.signal,
+                    timeoutMs: 8_000,
+                });
+                if (mode) setServerStatus(mode);
             } catch {
-                // Silent: the classify action will surface actionable API errors.
+                if (!controller.signal.aborted) setServerStatus("demo");
             }
         };
 
         checkHealth();
-        return () => { active = false; };
+        return () => controller.abort();
     }, []);
+
+    useEffect(() => () => activeRequestRef.current.controller?.abort(), []);
 
     const classify = useCallback(async (text) => {
         const trimmed = text.trim();
         if (!trimmed) return;
 
+        activeRequestRef.current.controller?.abort();
+        const controller = new AbortController();
+        const requestId = activeRequestRef.current.id + 1;
+        activeRequestRef.current = { id: requestId, controller };
+        lastSubmittedRef.current = trimmed;
+
         setLoading(true);
-        setError(null);
         setFallbackNote(null);
         setResult(null);
 
@@ -80,7 +86,6 @@ export default function TestModelPage() {
             setHistory((h) => [newResult, ...h].slice(0, 10));
             setServerStatus("demo");
             setFallbackNote(reason);
-            lastSubmittedRef.current = trimmed;
         };
 
         try {
@@ -88,33 +93,26 @@ export default function TestModelPage() {
                 useBrowserFallback();
                 return;
             }
-            const predictUrl = API_URL ? `${API_URL}/predict` : "/predict";
-            const res = await fetch(predictUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: trimmed }),
+            const pred = await requestPrediction(API_URL, trimmed, {
+                signal: controller.signal,
             });
+            if (activeRequestRef.current.id !== requestId) return;
 
-            if (!res.ok) {
-                if (res.status === 405) {
-                    throw new Error(
-                        "API returned 405. Set VITE_API_URL to your backend base URL only (example: https://<your-api-domain>, not your frontend URL and not ending with /predict)."
-                    );
-                }
-                throw new Error(`API returned ${res.status}`);
-            }
-
-            const data = await res.json();
-            const pred = data.predictions[0];
-            const newResult = { ...pred, mode: data.mode, timestamp: new Date() };
+            const newResult = { ...pred, timestamp: new Date() };
             setResult(newResult);
             setHistory((h) => [newResult, ...h].slice(0, 10));
-            setServerStatus(data.mode);
-            lastSubmittedRef.current = trimmed;
+            setServerStatus(pred.mode);
         } catch (err) {
-            useBrowserFallback("The configured model API could not be reached, so this result uses the transparent browser fallback.");
+            if (activeRequestRef.current.id !== requestId || controller.signal.aborted) return;
+            const reason = err instanceof NewsApiError
+                ? `${err.message} Showing the browser fallback instead.`
+                : "The model API could not be reached. Showing the browser fallback instead.";
+            useBrowserFallback(reason);
         } finally {
-            setLoading(false);
+            if (activeRequestRef.current.id === requestId) {
+                setLoading(false);
+                activeRequestRef.current.controller = null;
+            }
         }
     }, []);
 
@@ -189,7 +187,7 @@ export default function TestModelPage() {
                             "Classify"
                         )}
                     </button>
-                    <button className="clear-btn" onClick={() => { setInput(""); setResult(null); setError(null); }}>
+                    <button className="clear-btn" onClick={() => { setInput(""); setResult(null); }}>
                         Clear
                     </button>
                     <button
@@ -213,13 +211,6 @@ export default function TestModelPage() {
                     </div>
                 </div>
             </div>
-
-            {/* Error */}
-            {error && (
-                <div className="predict-error">
-                    <strong>Error:</strong> {error}
-                </div>
-            )}
 
             {fallbackNote && (
                 <div className="model-status-banner demo">

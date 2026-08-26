@@ -2,11 +2,11 @@ name: Terraform — Plan & Apply
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "terraform/**"
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "terraform/**"
 
