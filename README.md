@@ -249,6 +249,10 @@ npm test
 npm run build
 ```
 
+Verification for the current dashboard client: `5` API-client tests pass and
+the Vite production build completes. The build reports a non-blocking bundle
+size warning for the existing dashboard (`572.76 kB` minified JavaScript).
+
 ## Deployment notes
 
 - `streamlit_demo/` is the public demo and is deployed on Streamlit Community
