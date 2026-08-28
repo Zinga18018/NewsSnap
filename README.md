@@ -5,7 +5,51 @@ NewsSnap classifies AG News articles into `World`, `Sports`, `Business`, or
 saved evaluation artifacts, a FastAPI inference service, and two clients: a
 small Streamlit demo and a React diagnostics dashboard.
 
-## Live Demo
+## Project story
+
+### What is the project about?
+
+NewsSnap turns raw news text into one of four useful categories: World, Sports,
+Business, or Sci/Tech. It covers the full path from preparing the data and
+training a transformer to serving predictions through an API and displaying
+them in a web interface.
+
+### What was the thought process?
+
+The project was built in four layers: create fixed train, validation, and test
+datasets; fine-tune a compact transformer; expose the saved model through a
+validated API; then build a simple interface that shows the class and confidence.
+Tests and deployment files were added so the result was more than a notebook.
+
+### Why use this approach?
+
+DistilBERT understands word context better than a basic keyword counter while
+being smaller than full BERT. FastAPI keeps model inference separate from the
+user interface, which makes the system easier to test and replace. The demo also
+labels its fallback mode clearly so a keyword result is never presented as a
+real transformer prediction.
+
+### How does it work?
+
+```text
+AG News articles
+  -> fixed train, validation, and test files
+  -> DistilBERT tokenization and fine-tuning
+  -> saved model and evaluation artifacts
+  -> FastAPI prediction endpoint
+  -> Streamlit classifier or React diagnostics dashboard
+```
+
+### How to explain it in 30 seconds
+
+I built NewsSnap to practice the complete NLP product workflow. I fine-tuned
+DistilBERT to classify news into four categories, evaluated it on a separate
+12,000-article test set, and wrapped the saved model in a FastAPI service. I then
+built Streamlit and React interfaces and added tests and deployment workflows.
+The public demo clearly says when it is using a lightweight fallback instead of
+the trained model.
+
+## Demo
 
 [Open the Streamlit classifier](https://yogesh-newssnap-classifier.streamlit.app/)
 
