@@ -1,5 +1,7 @@
 # NewsSnap: Transformer News Classification
 
+[See the workflow flowchart and code walkthrough](WORKFLOW.md)
+
 NewsSnap classifies AG News articles into `World`, `Sports`, `Business`, or
 `Sci/Tech`. The repository contains a reproducible DistilBERT training pipeline,
 saved evaluation artifacts, a FastAPI inference service, and two clients: a
