@@ -1,156 +1,114 @@
-"""
-Upload data to S3 and publish metrics for the dashboard.
-This makes the pipeline end-to-end: data in S3, metrics in S3, dashboard reads from S3.
-"""
+"""Validate supplied evaluation files, then optionally publish them to S3.
 
-import boto3
+No scores are synthesized. By default no AWS requests are made. An upload needs
+--upload and an explicit bucket. File hashes do not independently verify a run.
+"""
+import argparse
+import hashlib
 import json
-import os
-import glob
-from datetime import datetime
+import math
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
-# Load env
-from dotenv import load_dotenv
-load_dotenv()
-
-s3 = boto3.client(
-    "s3",
-    region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-)
-
-DATA_BUCKET = os.getenv("S3_BUCKET_DATA", "llmop-ml-data-dev")
-METRICS_BUCKET = os.getenv("S3_BUCKET_METRICS", "llmop-ml-metrics-dev")
-MODELS_BUCKET = os.getenv("S3_BUCKET_MODELS", "llmop-ml-models-dev")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.utils.artifacts import dashboard_history
 
 
-def upload_data():
-    """Upload raw and processed data to S3."""
-    print("=" * 50)
-    print("STEP 1: Uploading data to S3")
-    print("=" * 50)
-
-    # Upload raw data
-    raw_dir = os.path.join("data", "raw")
-    if os.path.exists(raw_dir):
-        for f in glob.glob(os.path.join(raw_dir, "*.jsonl")):
-            key = f"raw/{os.path.basename(f)}"
-            print(f"  ↑ {f} → s3://{DATA_BUCKET}/{key}")
-            s3.upload_file(f, DATA_BUCKET, key)
+def load_artifact(path: Path, *, history: bool = False) -> dict | list:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    # Validate the complete document before any object can be uploaded, including
+    # optional nested fields outside the headline metrics dictionary.
+    json.dumps(payload, allow_nan=False)
+    if history:
+        rows = payload if isinstance(payload, list) else payload.get("metrics") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not rows or not all(isinstance(row, dict) and "epoch" in row for row in rows):
+            raise ValueError(f"{path.name}: missing measured training history")
+        loss_fields = {"train_loss", "val_loss"}
+        rate_fields = {"train_accuracy", "val_accuracy", "train_acc", "val_acc", "val_f1"}
+        measured_fields = loss_fields | rate_fields
+        for row in rows:
+            if not measured_fields.intersection(row):
+                raise ValueError(f"{path.name}: each epoch needs at least one measured loss or score")
+            for field in {"epoch"} | measured_fields.intersection(row):
+                value = row[field]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    raise ValueError(f"{path.name}: {field} must be finite numeric data")
+                if value < 0 or (field in rate_fields and value > 1):
+                    raise ValueError(f"{path.name}: {field} is outside its metric range")
+            for original, alias in (("train_accuracy", "train_acc"), ("val_accuracy", "val_acc")):
+                if original in row and alias in row and row[original] != row[alias]:
+                    raise ValueError(f"{path.name}: conflicting values for {original} and {alias}")
     else:
-        print("  ⚠ No raw data found, skipping")
+        if not isinstance(payload, dict):
+            raise ValueError(f"{path.name}: expected a JSON object")
+        count = payload.get("test_samples", payload.get("num_test_samples"))
+        if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+            raise ValueError(f"{path.name}: num_test_samples must be a positive integer")
+        metrics = payload.get("metrics")
+        if not isinstance(metrics, dict) or "accuracy" not in metrics:
+            raise ValueError(f"{path.name}: missing measured accuracy")
+        for key, value in metrics.items():
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value)):
+                raise ValueError(f"{path.name}: {key} must be finite numeric data")
+            lower = -1 if key == "mcc" else 0
+            if not lower <= value <= 1:
+                raise ValueError(f"{path.name}: {key} is outside its metric range")
+    return payload
 
-    # Upload processed data
-    proc_dir = os.path.join("data", "processed")
-    if os.path.exists(proc_dir):
-        for f in glob.glob(os.path.join(proc_dir, "*")):
-            if os.path.isfile(f):
-                key = f"processed/{os.path.basename(f)}"
-                print(f"  ↑ {f} → s3://{DATA_BUCKET}/{key}")
-                s3.upload_file(f, DATA_BUCKET, key)
+
+def prepare_publication(evaluation_path: Path, history_path: Path | None = None) -> dict:
+    paths = {"latest_evaluation.json": evaluation_path}
+    if history_path is not None:
+        paths["latest_metrics.json"] = history_path
+    artifacts = {}
+    manifest = {
+        "prepared_at": datetime.now(timezone.utc).isoformat(),
+        "source_kind": "supplied_evaluation_files",
+        "claim_boundary": "File validation is not independent verification of training or evaluation.",
+        "artifacts": {},
+    }
+    for key, path in paths.items():
+        artifacts[key] = load_artifact(path, history=key == "latest_metrics.json")
+        if key == "latest_metrics.json":
+            artifacts[key] = dashboard_history(artifacts[key])
+        manifest["artifacts"][key] = {
+            "source_filename": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    return {"artifacts": artifacts, "manifest": manifest}
+
+
+def upload_publication(publication: dict, bucket: str, client) -> None:
+    for key, payload in {**publication["artifacts"],
+                         "publication_manifest.json": publication["manifest"]}.items():
+        client.put_object(Bucket=bucket, Key=key,
+                          Body=json.dumps(payload, indent=2, allow_nan=False).encode("utf-8"),
+                          ContentType="application/json")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evaluation", type=Path, required=True)
+    parser.add_argument("--training-history", type=Path)
+    parser.add_argument("--upload", action="store_true")
+    parser.add_argument("--bucket")
+    args = parser.parse_args()
+    if args.upload and not args.bucket:
+        parser.error("--upload requires an explicit --bucket")
+    try:
+        publication = prepare_publication(args.evaluation, args.training_history)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    print(json.dumps(publication["manifest"], indent=2))
+    if args.upload:
+        import boto3
+        upload_publication(publication, args.bucket, boto3.client("s3"))
+        print("Uploaded supplied artifacts and their file-hash manifest.")
     else:
-        print("  ⚠ No processed data found, skipping")
-
-    print("  ✅ Data upload complete!\n")
-
-
-def publish_metrics():
-    """Publish evaluation metrics to S3 for the dashboard to read."""
-    print("=" * 50)
-    print("STEP 2: Publishing metrics to S3")
-    print("=" * 50)
-
-    # Evaluation results
-    evaluation = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "model_name": "distilbert-base-uncased",
-        "dataset": "ag_news",
-        "num_test_samples": 7600,
-        "metrics": {
-            "accuracy": 0.9142,
-            "f1_weighted": 0.9138,
-            "f1_macro": 0.9131,
-            "mcc": 0.8856,
-        },
-        "confusion_matrix": [
-            [1780, 35, 52, 33],
-            [22, 1868, 12, 18],
-            [48, 18, 1752, 42],
-            [30, 25, 38, 1827],
-        ],
-        "label_names": ["World", "Sports", "Business", "Sci/Tech"],
-        "classification_report": {
-            "World":    {"precision": 0.947, "recall": 0.937, "f1": 0.942, "support": 1900},
-            "Sports":   {"precision": 0.960, "recall": 0.973, "f1": 0.966, "support": 1920},
-            "Business": {"precision": 0.945, "recall": 0.942, "f1": 0.943, "support": 1860},
-            "Sci/Tech": {"precision": 0.952, "recall": 0.952, "f1": 0.952, "support": 1920},
-        },
-    }
-
-    # Training history
-    training_history = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "model_name": "distilbert-base-uncased",
-        "total_epochs": 3,
-        "best_epoch": 3,
-        "metrics": [
-            {"epoch": 1, "train_loss": 0.42, "train_acc": 0.852, "val_loss": 0.31, "val_acc": 0.889, "val_f1": 0.888},
-            {"epoch": 2, "train_loss": 0.22, "train_acc": 0.921, "val_loss": 0.25, "val_acc": 0.908, "val_f1": 0.908},
-            {"epoch": 3, "train_loss": 0.14, "train_acc": 0.953, "val_loss": 0.24, "val_acc": 0.914, "val_f1": 0.914},
-        ],
-    }
-
-    # Upload evaluation
-    eval_json = json.dumps(evaluation, indent=2)
-    s3.put_object(Body=eval_json, Bucket=METRICS_BUCKET, Key="latest_evaluation.json", ContentType="application/json")
-    print(f"  ↑ latest_evaluation.json → s3://{METRICS_BUCKET}/latest_evaluation.json")
-
-    # Upload training history
-    hist_json = json.dumps(training_history, indent=2)
-    s3.put_object(Body=hist_json, Bucket=METRICS_BUCKET, Key="latest_metrics.json", ContentType="application/json")
-    print(f"  ↑ latest_metrics.json → s3://{METRICS_BUCKET}/latest_metrics.json")
-
-    print("  ✅ Metrics published!\n")
-
-    # Return the public URL for the dashboard
-    metrics_url = f"https://{METRICS_BUCKET}.s3.amazonaws.com"
-    print(f"  📊 Dashboard metrics URL: {metrics_url}")
-    return metrics_url
-
-
-def verify_buckets():
-    """Verify all S3 buckets exist."""
-    print("=" * 50)
-    print("STEP 0: Verifying S3 buckets")
-    print("=" * 50)
-
-    for bucket in [DATA_BUCKET, MODELS_BUCKET, METRICS_BUCKET]:
-        try:
-            s3.head_bucket(Bucket=bucket)
-            print(f"  ✅ {bucket}")
-        except Exception as e:
-            print(f"  ❌ {bucket} — {e}")
-            return False
-    print()
-    return True
+        print("Validation only. No AWS requests were made.")
 
 
 if __name__ == "__main__":
-    print("\n🚀 LLMOps End-to-End Pipeline Runner\n")
-
-    if not verify_buckets():
-        print("❌ Some buckets are missing. Run 'terraform apply' first.")
-        exit(1)
-
-    upload_data()
-    metrics_url = publish_metrics()
-
-    print("=" * 50)
-    print("STEP 3: Summary")
-    print("=" * 50)
-    print(f"  ✅ Data uploaded to s3://{DATA_BUCKET}/")
-    print(f"  ✅ Metrics at s3://{METRICS_BUCKET}/")
-    print(f"  📊 Dashboard URL: {metrics_url}")
-    print(f"\n  Set VITE_METRICS_URL={metrics_url} in dashboard/.env")
-    print("\n🎉 Pipeline is end-to-end!\n")
+    main()

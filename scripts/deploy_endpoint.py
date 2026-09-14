@@ -5,7 +5,6 @@ Deploys a trained DistilBERT model from S3 to a SageMaker real-time endpoint.
 
 import os
 import argparse
-import boto3
 import sagemaker
 from sagemaker.pytorch import PyTorchModel
 from dotenv import load_dotenv
@@ -20,7 +19,7 @@ def deploy_model(model_data, role, image_uri, instance_type="ml.t2.medium"):
     print(f"[*] Using role: {role}")
     print(f"[*] Using image: {image_uri}")
 
-    sagemaker_session = sagemaker.Session()
+    sagemaker.Session()
 
     pytorch_model = PyTorchModel(
         model_data=model_data,

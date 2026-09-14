@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { browserDemoPrediction } from "../demoClassifier";
+import { predictionScoreLabel } from "../api/artifactData";
 import {
     NewsApiError,
     checkApiHealth,
@@ -8,9 +9,7 @@ import {
 } from "../api/newsApi";
 
 const API_URL = normalizeApiBase(
-    import.meta.env.DEV
-        ? (import.meta.env.VITE_API_URL || "http://localhost:8000")
-        : "https://newssnap.onrender.com"
+    import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "")
 );
 
 const SAMPLE_TEXTS = [
@@ -133,7 +132,7 @@ export default function TestModelPage() {
         classify(text);
     };
 
-    const modeBadgeText = serverStatus === "real" ? "Live Model" : serverStatus === "demo" ? "Public Demo" : null;
+    const modeBadgeText = serverStatus === "real" ? "Model API" : serverStatus === "demo" ? "Keyword Demo" : "Mode unverified";
 
     return (
         <div className="test-model-page">
@@ -152,12 +151,12 @@ export default function TestModelPage() {
             {serverStatus && (
                 <div className={`model-status-banner ${serverStatus}`}>
                     <strong>
-                        {serverStatus === "real" ? "Live model inference is active." : "Public demo fallback is active."}
+                        {serverStatus === "real" ? "Backend reports model inference." : serverStatus === "demo" ? "Keyword demonstration." : "Backend mode is unverified."}
                     </strong>
                     <span>
                         {serverStatus === "real"
-                            ? "Predictions are computed by the deployed DistilBERT backend."
-                            : "Predictions use a lightweight heuristic because the trained model is not loaded on this public deployment."}
+                            ? "Result scores are uncalibrated model outputs, not probabilities that a prediction is correct."
+                            : "Demonstration scores describe keyword matches; they do not measure DistilBERT confidence."}
                     </span>
                 </div>
             )}
@@ -201,7 +200,7 @@ export default function TestModelPage() {
 
                 {/* Sample Prompts */}
                 <div className="samples-section">
-                    <div className="samples-label">Try a sample</div>
+                    <div className="samples-label">Try an illustrative headline (not a current news feed)</div>
                     <div className="samples-grid">
                         {SAMPLE_TEXTS.map((text, i) => (
                             <button key={i} className="sample-chip" onClick={() => useSample(text)}>
@@ -226,7 +225,7 @@ export default function TestModelPage() {
                             {result.label}
                         </div>
                         <div className="result-meta">
-                            <span className="result-confidence">{(result.confidence * 100).toFixed(1)}% confidence</span>
+                            <span className="result-confidence">{(result.confidence * 100).toFixed(1)}% {predictionScoreLabel(result.mode)}</span>
                             <span className="result-latency">{result.latency_ms}ms</span>
                         </div>
                     </div>
@@ -275,7 +274,7 @@ export default function TestModelPage() {
                             <tr>
                                 <th>Text</th>
                                 <th>Label</th>
-                                <th>Confidence</th>
+                                <th>Score and source</th>
                                 <th>Latency</th>
                                 <th>Time</th>
                             </tr>
@@ -297,7 +296,7 @@ export default function TestModelPage() {
                                             {h.label}
                                         </span>
                                     </td>
-                                    <td>{(h.confidence * 100).toFixed(1)}%</td>
+                                    <td>{(h.confidence * 100).toFixed(1)}% · {predictionScoreLabel(h.mode)}</td>
                                     <td>{h.latency_ms}ms</td>
                                     <td className="mono">{h.timestamp.toLocaleTimeString()}</td>
                                 </tr>

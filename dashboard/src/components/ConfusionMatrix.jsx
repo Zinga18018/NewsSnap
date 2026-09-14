@@ -18,8 +18,7 @@ export default function ConfusionMatrix({ matrix, labels }) {
         );
     }
 
-    const maxVal = Math.max(...matrix.flat());
-    const cols = labels.length + 1;
+    const maxVal = Math.max(...matrix.flat(), 1);
 
     return (
         <div

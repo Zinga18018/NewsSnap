@@ -7,7 +7,6 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    ReferenceLine,
 } from "recharts";
 
 const CustomTooltip = ({ active, payload }) => {
@@ -59,7 +58,6 @@ export default function PRAUCChart({ data }) {
                     domain={[0, 1]}
                     label={{ value: "Precision", angle: -90, position: "insideLeft", offset: 15, fill: "#4a4a5a", fontSize: 11 }}
                 />
-                <ReferenceLine y={0.25} stroke="rgba(255,255,255,0.06)" strokeDasharray="6 4" label={{ value: "Random", fill: "#333340", fontSize: 10, position: "right" }} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.06)" }} />
                 <Area
                     type="monotone"

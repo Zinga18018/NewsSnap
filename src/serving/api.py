@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.utils.logging_config import setup_logging
+from src.utils.artifacts import dashboard_history
 from src.utils.rate_limiter import EndpointRateLimiter, RateLimiterMiddleware
 from src.utils.validation import ValidationError, validate_text
 
@@ -29,6 +30,7 @@ MAX_TEXT_LENGTH = 5000
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIST_DIR = PROJECT_ROOT / "dashboard" / "dist"
 METRICS_DIR = PROJECT_ROOT / "models" / "latest"
+HISTORICAL_METRICS_DIR = PROJECT_ROOT / "evidence"
 
 _model_state = {"mode": None, "artifacts": None, "loaded_at": None}
 _start_time = time.time()
@@ -263,6 +265,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Metrics-Source"],
 )
 app.add_middleware(RateLimiterMiddleware, requests_per_minute=100)
 
@@ -293,15 +296,23 @@ def _load_json_file(path: Path):
 
 @app.get("/metrics/latest_evaluation.json")
 def latest_evaluation():
-    return JSONResponse(content=_load_json_file(METRICS_DIR / "evaluation_results.json"))
+    path, source = _metrics_source("evaluation_results.json")
+    return JSONResponse(content=_load_json_file(path), headers={"X-Metrics-Source": source})
+
+
+def _metrics_source(filename: str) -> tuple[Path, str]:
+    """Prefer model-directory records; fall back only when that file is absent."""
+    primary = METRICS_DIR / filename
+    if primary.exists():
+        return primary, "model_directory"
+    return HISTORICAL_METRICS_DIR / filename, "historical_evidence"
 
 
 @app.get("/metrics/latest_metrics.json")
 def latest_metrics():
-    history = _load_json_file(METRICS_DIR / "training_history.json")
-    if isinstance(history, list):
-        return JSONResponse(content={"metrics": history})
-    return JSONResponse(content=history)
+    path, source = _metrics_source("training_history.json")
+    history = _load_json_file(path)
+    return JSONResponse(content=dashboard_history(history), headers={"X-Metrics-Source": source})
 
 
 @app.post("/predict", response_model=PredictResponse)

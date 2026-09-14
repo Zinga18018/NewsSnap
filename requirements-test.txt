@@ -1,0 +1,10 @@
+# Tests exercise data transforms, API/demo mode, and publication contracts.
+# No transformer weights, SageMaker SDK, or GPU packages are needed.
+numpy>=2.0,<3
+pandas>=2.2,<3
+scikit-learn>=1.5,<2
+fastapi>=0.109,<1
+httpx>=0.27,<1
+python-dotenv>=1,<2
+pytest>=8,<10
+ruff>=0.9,<1

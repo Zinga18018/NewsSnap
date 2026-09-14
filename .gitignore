@@ -52,3 +52,9 @@ data/processed/
 artifacts/
 sagemaker_deploy.json
 sagemaker_proxy_url.json
+
+# Local verification environments
+.uv-cache/
+.pytest_cache/
+.ruff_cache/
+.venv314/

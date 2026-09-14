@@ -1,51 +1,20 @@
-"""Tests for model training utilities."""
+"""The legacy checkout must give useful guidance without starting a partial run."""
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
+ROOT = Path(__file__).resolve().parents[1]
 
-class TestTextClassificationDataset:
-    """Test the dataset class independently to avoid heavy torch/transformers imports."""
 
-    def test_import_config(self):
-        """Verify config module loads correctly."""
-        import config
-        assert config.NUM_LABELS == 4
-        assert config.MODEL_NAME == "distilbert-base-uncased"
-        assert config.BATCH_SIZE == 32
-
-    def test_label_map(self):
-        """Verify AG News label mapping."""
-        import config
-        assert config.LABEL_MAP[0] == "World"
-        assert config.LABEL_MAP[1] == "Sports"
-        assert config.LABEL_MAP[2] == "Business"
-        assert config.LABEL_MAP[3] == "Sci/Tech"
-        assert len(config.LABEL_MAP) == 4
-
-    def test_training_hyperparameters(self):
-        """Verify hyperparameter defaults."""
-        import config
-        assert config.LEARNING_RATE == 2e-5
-        assert config.NUM_EPOCHS == 3
-        assert config.MAX_SEQ_LENGTH == 128
-
-    def test_dataset_class_importable(self):
-        """Test that the dataset module is importable (may skip on torch issues)."""
-        try:
-            from src.models.train import TextClassificationDataset
-            assert TextClassificationDataset is not None
-        except ImportError as e:
-            if "torch" in str(e).lower() or "transformers" in str(e).lower():
-                pytest.skip(f"torch/transformers not available on this Python version: {e}")
-            raise
-
-    def test_data_files_exist(self):
-        """Verify processed data files exist after preprocessing."""
-        import os
-        processed_dir = os.path.join("data", "processed")
-        if os.path.exists(processed_dir):
-            assert os.path.exists(os.path.join(processed_dir, "train.jsonl"))
-            assert os.path.exists(os.path.join(processed_dir, "val.jsonl"))
-            assert os.path.exists(os.path.join(processed_dir, "test.jsonl"))
-        else:
-            pytest.skip("Processed data not yet available")
+@pytest.mark.parametrize("script", ["run_local_pipeline.py", "trigger_training.py"])
+def test_retired_training_entrypoint_has_no_data_or_cloud_side_effects(tmp_path, script):
+    completed = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / script)],
+        cwd=tmp_path, capture_output=True, text=True, check=False,
+    )
+    assert completed.returncode == 2
+    assert "ai-engineering-lab/tree/main/newssnap" in completed.stdout
+    assert "uv run python -m src.models.train --help" in completed.stdout
+    assert list(tmp_path.iterdir()) == []

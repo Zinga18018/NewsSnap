@@ -1,27 +1,21 @@
 import React from "react";
-
-const MODEL_INFO = [
-    { label: "Architecture", value: "DistilBERT" },
-    { label: "Base Model", value: "distilbert-base-uncased" },
-    { label: "Dataset", value: "AG News (120K)" },
-    { label: "Classes", value: "4 categories" },
-    { label: "Max Seq Length", value: "128 tokens" },
-    { label: "Batch Size", value: "32" },
-    { label: "Learning Rate", value: "2e-5" },
-    { label: "Optimizer", value: "AdamW" },
-    { label: "Infrastructure", value: "SageMaker" },
-    { label: "Container", value: "Docker → ECR" },
-];
+import provenance from "../../../evidence/provenance.json";
 
 export default function ModelCard() {
-    return (
-        <div>
-            {MODEL_INFO.map((row, i) => (
-                <div className="info-row" key={i}>
-                    <span className="info-label">{row.label}</span>
-                    <span className="info-value">{row.value}</span>
-                </div>
-            ))}
-        </div>
-    );
+    const run = provenance.training_run;
+    const checkpoint = provenance.checkpoint;
+    const rows = [
+        ["Base model", checkpoint.base_model],
+        ["Recorded run date", run.date],
+        ["Training examples", run.training_examples.toLocaleString()],
+        ["Validation examples", run.validation_examples.toLocaleString()],
+        ["Recorded epochs", run.epochs],
+        ["Batch size", run.batch_size],
+        ["Learning rate", run.learning_rate],
+        ["Maximum input", `${checkpoint.max_tokens} tokens`],
+        ["Device in historical log", run.device_recorded],
+    ];
+    return <div>{rows.map(([label, value]) => <div className="info-row" key={label}>
+        <span className="info-label">{label}</span><span className="info-value">{value}</span>
+    </div>)}</div>;
 }

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS dashboard-builder
+FROM node:22-alpine AS dashboard-builder
 
 WORKDIR /build/dashboard
 
@@ -6,6 +6,7 @@ COPY dashboard/package.json dashboard/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY dashboard/ ./
+COPY evidence/ /build/evidence/
 RUN npm run build
 
 
@@ -26,8 +27,8 @@ RUN pip install --upgrade pip && pip install --prefer-binary -r requirements-run
 
 COPY config.py ./
 COPY src ./src
-COPY models/latest/evaluation_results.json ./models/latest/evaluation_results.json
-COPY models/latest/training_history.json ./models/latest/training_history.json
+COPY evidence/evaluation_results.json ./models/latest/evaluation_results.json
+COPY evidence/training_history.json ./models/latest/training_history.json
 COPY --from=dashboard-builder /build/dashboard/dist ./dashboard/dist
 
 EXPOSE 8000

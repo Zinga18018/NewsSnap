@@ -1,11 +1,8 @@
 """Tests for data preprocessing module."""
 
 import json
-import os
-import tempfile
 
 import pandas as pd
-import pytest
 
 from src.data.preprocessing import clean_text, load_jsonl, create_splits
 

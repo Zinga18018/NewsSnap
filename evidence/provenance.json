@@ -1,0 +1,60 @@
+{
+  "project": "NewsSnap",
+  "task": "Four-class English news classification",
+  "checkpoint": {
+    "id": "newssnap-distilbert-agnews-20260220",
+    "base_model": "distilbert-base-uncased",
+    "architecture": "DistilBertForSequenceClassification",
+    "sha256": "48d6f8940aedcb16f275465ab8e003b5a12b647fd3776619d530c712f2eeeac6",
+    "bytes": 267838720,
+    "format": "safetensors",
+    "max_tokens": 128,
+    "original_transformers_version": "4.57.3"
+  },
+  "training_run": {
+    "date": "2026-02-20",
+    "training_examples": 512,
+    "validation_examples": 128,
+    "epochs": 1,
+    "batch_size": 8,
+    "learning_rate": 0.00002,
+    "device_recorded": "cuda",
+    "evidence": "training_run.log",
+    "random_seed_recorded": false
+  },
+  "prepared_data": {
+    "dataset": "AG News",
+    "upstream_split": "train",
+    "train_pool": 96000,
+    "validation_pool": 12000,
+    "test": 12000,
+    "label_counts": {
+      "train_pool": [24000, 24000, 24000, 24000],
+      "validation_pool": [3000, 3000, 3000, 3000],
+      "test": [3000, 3000, 3000, 3000]
+    },
+    "split_seed_in_source": 42,
+    "note": "The 12000-example test is a project-created split of AG News training data, not the official AG News test split."
+  },
+  "overlap_audit": {
+    "checked_on": "2026-08-30",
+    "normalization": "strip, collapse whitespace, lowercase",
+    "unique_texts": {"train_pool": 95907, "validation_pool": 11997, "test": 11998},
+    "train_pool_vs_validation": 25,
+    "train_pool_vs_test": 27,
+    "validation_vs_test": 1,
+    "fitted_subset_overlap": "Not established. The original 512/128 sampled row IDs were not saved."
+  },
+  "limitations": [
+    "Saved metrics describe the February 2026 experiment, not live traffic or a new evaluation.",
+    "The checkpoint used 512 training examples from a prepared 96000-example pool.",
+    "Prepared splits contain overlapping normalized text. Do not call the recorded result leakage-free.",
+    "Softmax scores are not calibrated probabilities of correctness.",
+    "No evaluation of present-day headlines, other languages, or out-of-domain detection is recorded.",
+    "This application performs classification, not summarization or news aggregation.",
+    "This build runs locally. No production deployment, cloud operation, or uptime is claimed."
+  ],
+  "source_repository": "https://github.com/Zinga18018/NewsSnap",
+  "source_checkout_commit": "c982dc8e72288fef8a41e24360348d3649f0b8eb",
+  "recovered_from": "Original LLMOPS source, saved checkpoint, evaluation records, and training log"
+}

@@ -4,13 +4,12 @@ Deploys a trained model to a SageMaker endpoint.
 """
 
 import argparse
-import json
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import config
-from src.utils.aws_helpers import upload_model_to_s3, get_s3_client
+from src.utils.aws_helpers import upload_model_to_s3
 
 import boto3
 
@@ -89,7 +88,7 @@ def deploy_to_sagemaker(model_dir: str, endpoint_name: str = None):
         )
         print(f"[Deploy] Creating endpoint: {endpoint_name}")
 
-    print(f"[Deploy] Endpoint deploying... This takes 5-10 minutes.")
+    print("[Deploy] Endpoint deploying... This takes 5-10 minutes.")
     print(f"[Deploy] Monitor at: https://{config.AWS_REGION}.console.aws.amazon.com/sagemaker/home?region={config.AWS_REGION}#/endpoints/{endpoint_name}")
 
 

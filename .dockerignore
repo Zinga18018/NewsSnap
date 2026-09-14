@@ -31,3 +31,7 @@ dashboard/dist/
 *.zip
 *.tar
 *.tar.gz
+
+.venv*/
+.uv-cache/
+.ruff_cache/

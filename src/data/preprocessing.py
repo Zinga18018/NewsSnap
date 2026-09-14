@@ -6,7 +6,6 @@ import sys
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from transformers import AutoTokenizer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 import config
@@ -136,6 +135,8 @@ def preprocess_pipeline(input_dir: str = None, output_dir: str = None) -> dict:
         split_df.to_json(filepath, orient="records", lines=True)
         results[split_name] = {"path": filepath, "count": len(split_df)}
         logger.info("Saved %s split: %d samples -> %s", split_name, len(split_df), filepath)
+
+    from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
     tokenizer_path = os.path.join(output_dir, "tokenizer")

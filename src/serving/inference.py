@@ -3,9 +3,6 @@
 import json
 import os
 
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
 from src.utils.logging_config import setup_logging
 
 logger = setup_logging(__name__)
@@ -13,11 +10,13 @@ logger = setup_logging(__name__)
 LABEL_MAP = {0: "World", 1: "Sports", 2: "Business", 3: "Sci/Tech"}
 MAX_SEQ_LENGTH = int(os.environ.get("MAX_SEQ_LENGTH", "128"))
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 def model_fn(model_dir: str):
     """Load model and tokenizer from the model directory."""
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Loading model from %s", model_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(device)
@@ -43,7 +42,10 @@ def input_fn(request_body: str, request_content_type: str = "application/json"):
 
 def predict_fn(input_data: dict, model_artifacts: dict):
     """Run inference on the input data."""
+    import torch
+
     model = model_artifacts["model"]
+    device = next(model.parameters()).device
     tokenizer = model_artifacts["tokenizer"]
     texts = input_data["texts"]
 

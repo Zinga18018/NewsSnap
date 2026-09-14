@@ -1,33 +1,38 @@
-# NewsSnap Legacy Serving Repository: workflow
+# NewsSnap legacy serving workflow
 
-The serving module loads a sequence-classification model, tokenizes incoming news text and returns four-topic probabilities. The consolidated AI Engineering Lab contains the newer provenance and training workflow.
-
-**Relevant roles:** ML engineering foundations.
-
-## Flowchart
+The API loads an available sequence-classification checkpoint and returns four
+topic scores. When weights are absent, it explicitly identifies keyword demo
+mode. New training belongs to the maintained AI Engineering Lab project.
 
 ```mermaid
 flowchart TD
-A["Model directory with tokenizer and weights"] --> B["Load sequence-classification model"]
-    C["JSON text input"] --> D["Parse supported input shape"]
-    D --> E["Tokenize with padding and truncation"]
-    B --> F["Run inference without gradients"]
+    A["JSON news text"] --> B["Validate size and input shape"]
+    B --> C{"Weights available?"}
+    C -->|Yes| D["Tokenize and classify"]
+    C -->|No| E["Report keyword demo mode"]
+    D --> F["Topic scores and model mode"]
     E --> F
-    F --> G["Softmax probabilities and topic label"]
-    G --> H["JSON response"]
-    I["Local pipeline script"] -.-> J["Training imports reference missing src/models modules in this checkout"]
+    G["Legacy training command"] --> H["Exit with maintained training instructions"]
+    I["Supplied evaluation files"] --> J["Validate values and hash files"]
+    J --> K{"Explicit upload requested?"}
+    K -->|No| L["Print manifest locally"]
+    K -->|Yes| M["Publish supplied values and manifest"]
 ```
 
-## Explain it in an interview
+## Follow the implementation
 
-“The implemented serving path is clear, but this older repository needs reconciliation with the consolidated project before I present it as reproducible end to end.”
+- [API and explicit inference mode](src/serving/api.py)
+- [Inference handlers](src/serving/inference.py)
+- [Training migration entry point](scripts/run_local_pipeline.py)
+- [Measured-file publisher](scripts/run_pipeline.py)
+- [Publication regression tests](tests/test_artifact_publication.py)
+- [Checkpoint provenance and limitations](evidence/provenance.json)
+- [Maintained training implementation](https://github.com/Zinga18018/ai-engineering-lab/tree/main/newssnap)
 
-## What this diagram does and does not establish
+## What this establishes
 
-The local pipeline references src.models.train and src.models.evaluate, which are absent from this checkout. Treat its end-to-end training instructions as incomplete. Use the [consolidated NewsSnap workflow](https://github.com/Zinga18018/ai-engineering-lab/tree/main/newssnap) for the recovered checkpoint provenance and newer implementation; this chart does not verify a running cloud deployment.
-
-## Follow the code
-
-- [Implemented inference handlers](src/serving/inference.py)
-- [Local pipeline entry point](scripts/run_local_pipeline.py)
-- [Data preparation](src/data/preprocessing.py)
+The legacy scripts no longer reference absent training modules or fabricate
+evaluation scores. The recovered checkpoint records **512 training examples**,
+not the prepared 96,000-example pool. Its original sampled IDs are missing.
+File hashes support traceability, not independent proof of training. No cloud
+deployment or fresh model-quality evaluation is established by this diagram.

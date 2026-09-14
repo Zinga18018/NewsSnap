@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import MetricsChart from "./components/MetricsChart";
-import PipelineStatus from "./components/PipelineStatus";
+
 import ModelCard from "./components/ModelCard";
 import ConfusionMatrix from "./components/ConfusionMatrix";
 import PRAUCChart from "./components/PRAUCChart";
@@ -25,490 +25,215 @@ const Icons = {
     testmodel: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>,
 };
 
-const DEMO_METRICS = {
-    accuracy: 0.8699,
-    f1_weighted: 0.8692,
-    f1_macro: 0.8692,
-    mcc: 0.8270,
-};
-
-const DEMO_HISTORY = [
-    { epoch: 1, train_loss: 1.1816, train_acc: 0.6582, val_loss: 0.9204, val_acc: 0.9141, val_f1: 0.9135 },
-];
-
-const DEMO_PR_DATA = [
-    { recall: 0.0, precision: 1.0 },
-    { recall: 0.1, precision: 0.99 },
-    { recall: 0.2, precision: 0.985 },
-    { recall: 0.3, precision: 0.981 },
-    { recall: 0.4, precision: 0.974 },
-    { recall: 0.5, precision: 0.968 },
-    { recall: 0.6, precision: 0.958 },
-    { recall: 0.7, precision: 0.946 },
-    { recall: 0.8, precision: 0.931 },
-    { recall: 0.85, precision: 0.918 },
-    { recall: 0.9, precision: 0.895 },
-    { recall: 0.92, precision: 0.878 },
-    { recall: 0.95, precision: 0.841 },
-    { recall: 0.97, precision: 0.792 },
-    { recall: 0.99, precision: 0.702 },
-    { recall: 1.0, precision: 0.55 },
-];
-
-const DEMO_CONFUSION = [
-    [1780, 35, 52, 33],
-    [22, 1868, 12, 18],
-    [48, 18, 1752, 42],
-    [30, 25, 38, 1827],
-];
-
-const DEMO_LABELS = ["World", "Sports", "Business", "Sci/Tech"];
-
-const DEMO_PIPELINE = [
-    { name: "Data Ingestion", status: "success", time: "2m 14s" },
-    { name: "Preprocessing", status: "success", time: "1m 38s" },
-    { name: "Tokenization", status: "success", time: "4m 02s" },
-    { name: "Model Training", status: "success", time: "34m 12s" },
-    { name: "Evaluation", status: "success", time: "2m 05s" },
-    { name: "Model Registry", status: "running", time: "..." },
-    { name: "Endpoint Deploy", status: "pending", time: "—" },
-];
-
+import bundledEvaluation from "../../evidence/evaluation_results.json";
+import bundledHistory from "../../evidence/training_history.json";
+import provenance from "../../evidence/provenance.json";
+import { resolveArtifacts } from "./api/artifactData";
 const METRICS_URL = (import.meta.env.VITE_METRICS_URL || "/metrics").replace(/\/$/, "");
+const SOURCE_BASE = "https://github.com/Zinga18018/NewsSnap/blob/master";
+const number = (value, digits = 1) => typeof value === "number" ? value.toFixed(digits) : "—";
+const percent = (value) => typeof value === "number" ? `${(value * 100).toFixed(2)}%` : "—";
 
 function App() {
-    const [metrics, setMetrics] = useState(DEMO_METRICS);
-    const [history, setHistory] = useState(DEMO_HISTORY);
-    const [prData, setPrData] = useState(DEMO_PR_DATA);
-    const [confusion, setConfusion] = useState(DEMO_CONFUSION);
-    const [labels, setLabels] = useState(DEMO_LABELS);
-    const [pipeline, setPipeline] = useState(DEMO_PIPELINE);
+    const [artifacts, setArtifacts] = useState(() => resolveArtifacts({ bundledEvaluation, bundledHistory }));
     const [activeNav, setActiveNav] = useState("insights");
-    const [lastRefresh, setLastRefresh] = useState(new Date());
-    const [hasLiveMetrics, setHasLiveMetrics] = useState(false);
+    const [lastChecked, setLastChecked] = useState(null);
 
     useEffect(() => {
-        if (!METRICS_URL) return;
-        const fetchMetrics = async () => {
+        const controller = new AbortController();
+        const load = async (filename) => {
             try {
-                const [evalRes, histRes] = await Promise.all([
-                    fetch(`${METRICS_URL}/latest_evaluation.json`),
-                    fetch(`${METRICS_URL}/latest_metrics.json`),
-                ]);
-                let loadedLiveMetrics = false;
-                if (evalRes.ok) {
-                    const evalData = await evalRes.json();
-                    setMetrics(evalData.metrics);
-                    if (evalData.confusion_matrix) setConfusion(evalData.confusion_matrix);
-                    if (evalData.label_names) setLabels(evalData.label_names);
-                    if (evalData.pr_curve) setPrData(evalData.pr_curve);
-                    loadedLiveMetrics = true;
-                }
-                if (histRes.ok) {
-                    const histData = await histRes.json();
-                    if (histData.metrics) setHistory(histData.metrics);
-                    loadedLiveMetrics = true;
-                }
-                setHasLiveMetrics(loadedLiveMetrics);
-                setLastRefresh(new Date());
-            } catch (err) {
-                setHasLiveMetrics(false);
-                console.log("Using demo data:", err.message);
-            }
+                const response = await fetch(`${METRICS_URL}/${filename}`, { signal: controller.signal });
+                return response.ok ? await response.json() : null;
+            } catch { return null; }
         };
-        fetchMetrics();
-        const interval = setInterval(fetchMetrics, 30000);
-        return () => clearInterval(interval);
+        const fetchArtifacts = async () => {
+            const [evaluationPayload, historyPayload] = await Promise.all([
+                load("latest_evaluation.json"), load("latest_metrics.json"),
+            ]);
+            if (controller.signal.aborted) return;
+            setArtifacts(resolveArtifacts({ bundledEvaluation, bundledHistory, evaluationPayload, historyPayload }));
+            setLastChecked(new Date());
+        };
+        fetchArtifacts();
+        const interval = setInterval(fetchArtifacts, 30000);
+        return () => { controller.abort(); clearInterval(interval); };
     }, []);
 
     const navItems = [
-        { id: "insights", icon: Icons.insights, label: "Insights" },
-        { id: "training", icon: Icons.training, label: "Training Jobs" },
-        { id: "models", icon: Icons.models, label: "Model Registry" },
-        { id: "endpoints", icon: Icons.endpoints, label: "Endpoints" },
+        { id: "insights", icon: Icons.insights, label: "Evaluation Record" },
+        { id: "training", icon: Icons.training, label: "Training Record" },
+        { id: "models", icon: Icons.models, label: "Model Provenance" },
         { id: "testmodel", icon: Icons.testmodel, label: "Test Model" },
-        { id: "data", icon: Icons.data, label: "Data Pipeline" },
+        { id: "data", icon: Icons.data, label: "Data & Limitations" },
+        { id: "infra", icon: Icons.infra, label: "Deployment Guide" },
     ];
-
-    const navBottom = [
-        { id: "infra", icon: Icons.infra, label: "Infrastructure" },
-        { id: "settings", icon: Icons.settings, label: "Settings" },
-    ];
-
-    const renderPageContent = () => {
-        switch (activeNav) {
-            case "insights":
-                return <InsightsPage metrics={metrics} history={history} prData={prData} confusion={confusion} labels={labels} pipeline={pipeline} lastRefresh={lastRefresh} isLiveData={hasLiveMetrics} />;
-            case "training":
-                return <TrainingPage history={history} lastRefresh={lastRefresh} isLiveData={hasLiveMetrics} />;
-            case "models":
-                return <ModelsPage />;
-            case "endpoints":
-                return <EndpointsPage />;
-            case "testmodel":
-                return <TestModelPage />;
-            case "data":
-                return <DataPage pipeline={pipeline} />;
-            case "infra":
-                return <InfraPage />;
-            case "settings":
-                return <SettingsPage />;
-            default:
-                return null;
-        }
+    const pages = {
+        insights: <InsightsPage artifacts={artifacts} lastChecked={lastChecked} />,
+        training: <TrainingPage artifacts={artifacts} lastChecked={lastChecked} />,
+        models: <ModelsPage />,
+        testmodel: <TestModelPage />,
+        data: <DataPage />,
+        infra: <DeploymentPage />,
     };
-
-    const pageTitle = [...navItems, ...navBottom].find(n => n.id === activeNav)?.label || "Dashboard";
-
     return (
         <div className="app-layout">
             <aside className="sidebar">
-                <div className="sidebar-brand">
-                    <div className="brand-icon">{Icons.zap}</div>
-                    <span className="brand-name">NewsSnap</span>
-                </div>
+                <div className="sidebar-brand"><div className="brand-icon">{Icons.zap}</div><span className="brand-name">NewsSnap</span></div>
                 <nav className="sidebar-nav">
-                    <div className="nav-section-label">Overview</div>
+                    <div className="nav-section-label">Project evidence</div>
                     {navItems.map((item) => (
-                        <div key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`} onClick={() => setActiveNav(item.id)}>
+                        <button type="button" key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`}
+                            style={{ border: 0, textAlign: "left", background: activeNav === item.id ? undefined : "transparent" }}
+                            onClick={() => setActiveNav(item.id)}>
                             <span className="icon">{item.icon}</span>{item.label}
-                        </div>
-                    ))}
-                    <div className="nav-section-label" style={{ marginTop: "0.5rem" }}>System</div>
-                    {navBottom.map((item) => (
-                        <div key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`} onClick={() => setActiveNav(item.id)}>
-                            <span className="icon">{item.icon}</span>{item.label}
-                        </div>
+                        </button>
                     ))}
                 </nav>
-                <div className="sidebar-footer">
-                    <span className="version">DistilBERT · AG News</span>
-                </div>
+                <div className="sidebar-footer"><span className="version">DistilBERT · historical AG News experiment</span></div>
             </aside>
-
             <main className="main-content">
-                <div className="topbar">
-                    <div className="topbar-left"><h2>{pageTitle}</h2></div>
-                    <div className="topbar-right">
-                        <div className="avatar">KU</div>
-                    </div>
-                </div>
-                <div className="page-content">{renderPageContent()}</div>
+                <div className="topbar"><div className="topbar-left"><h2>{navItems.find((item) => item.id === activeNav)?.label}</h2></div></div>
+                <div className="page-content">{pages[activeNav]}</div>
             </main>
         </div>
     );
 }
 
-/* ─── TIMESCALE SELECTOR ─── */
-function DataRefreshBar({ lastRefresh, isLiveData }) {
-    return (
-        <div className="config-bar">
-            <div className="refresh-info">
-                <span className="icon-inline">{Icons.clock}</span>
-                <span className="refresh-text">Updated {lastRefresh ? lastRefresh.toLocaleTimeString() : "now"}</span>
-            </div>
-            <div className="spacer" />
-            <span className={`source-chip ${isLiveData ? "live" : "demo"}`}>
-                {isLiveData ? "Live metrics source" : "Verified artifact snapshot"}
-            </span>
-            <span className="refresh-chip">Per-epoch view</span>
-            <button className="refresh-btn" onClick={() => window.location.reload()} title="Refresh data">
-                {Icons.refresh}
-            </button>
+function SourceLink({ path, children }) {
+    return <a href={`${SOURCE_BASE}/${path}`} target="_blank" rel="noreferrer">{children}</a>;
+}
+
+function EvidenceNotice() {
+    return <div className="metrics-source-banner demo">
+        <strong>Historical experiment.</strong>
+        <span>The saved February 2026 checkpoint used 512 training examples and 128 validation examples for one epoch.
+            Original sampled row IDs were not saved; overlap with the evaluation split is not established.
+            These records do not measure current traffic or cloud uptime.</span>
+    </div>;
+}
+
+function DataRefreshBar({ lastChecked, source }) {
+    return <div className="config-bar">
+        <div className="refresh-info"><span className="icon-inline">{Icons.clock}</span>
+            <span className="refresh-text">{lastChecked ? `Files last checked ${lastChecked.toLocaleTimeString()}` : "Showing bundled evidence"}</span></div>
+        <div className="spacer" />
+        <span className="source-chip demo">{source}</span>
+        <button className="refresh-btn" onClick={() => window.location.reload()} title="Check saved files again">{Icons.refresh}</button>
+    </div>;
+}
+
+function InsightsPage({ artifacts, lastChecked }) {
+    const { evaluation, history, evaluationSource, historySource } = artifacts;
+    const metrics = evaluation?.metrics ?? {};
+    return <>
+        <EvidenceNotice />
+        <DataRefreshBar lastChecked={lastChecked} source={evaluationSource} />
+        <p className="page-desc">Evaluation record: {evaluation?.timestamp?.slice(0, 10) || "date not supplied"}.
+            {evaluation?.sampleCount ? ` ${evaluation.sampleCount.toLocaleString()} articles in the supplied evaluation file.` : " Sample count unavailable."}
+            {" "}The bundled record uses a project-created AG News split, not its official test split.</p>
+        <div className="metrics-row">
+            {[
+                ["Accuracy", percent(metrics.accuracy), "Reported evaluation result", "cyan"],
+                ["F1 weighted", percent(metrics.f1_weighted), "Reported evaluation result", "emerald"],
+                ["F1 macro", percent(metrics.f1_macro), "Reported evaluation result", "amber"],
+                ["MCC", number(metrics.mcc, 3), "Reported evaluation result", "violet"],
+            ].map(([label, value, detail, color]) => <div className={`card metric-card ${color}`} key={label}>
+                <div className="metric-header"><span className="metric-label">{label}</span><span className="metric-badge">Saved</span></div>
+                <div className="metric-value">{value}</div><div className="metric-sub">{detail}</div>
+            </div>)}
         </div>
-    );
+        <div className="charts-row">
+            <div className="card chart-card"><div className="chart-header"><div><div className="chart-title">Recorded training loss</div>
+                <div className="chart-subtitle">{historySource} · {history.length} recorded epoch{history.length === 1 ? "" : "s"}</div></div></div>
+                <MetricsChart data={history} lines={[{ key: "train_loss", color: "#22d3ee", name: "Train loss" }, { key: "val_loss", color: "#a78bfa", name: "Validation loss" }]} areaFill />
+            </div>
+            <div className="card chart-card"><div className="chart-header"><div><div className="chart-title">Precision-recall curve</div>
+                <div className="chart-subtitle">{evaluation?.prData ? "Curve supplied by the selected artifact; averaging method not verified" : "No curve is present in the selected artifact"}</div></div></div>
+                {evaluation?.prData ? <PRAUCChart data={evaluation.prData} /> : <div className="empty-state"><h4>No measured curve available</h4><p>A scalar accuracy or F1 value cannot reconstruct a precision-recall curve.</p></div>}
+            </div>
+        </div>
+        <div className="charts-row">
+            <div className="card section-card"><div className="section-title">Historical model information</div><ModelCard /></div>
+            <div className="card section-card"><div className="section-title">Saved confusion matrix</div>
+                <p className="page-desc">Rows: actual category. Columns: predicted category.</p>
+                {evaluation?.confusion ? <ConfusionMatrix matrix={evaluation.confusion} labels={evaluation.labels} /> : <div className="empty-state"><h4>Matrix unavailable</h4><p>The selected file must include a valid matrix, labels, and consistent counts.</p></div>}
+            </div>
+        </div>
+        <p className="page-desc"><SourceLink path="evidence/evaluation_results.json">Original evaluation record</SourceLink>{" · "}
+            <SourceLink path="evidence/provenance.json">Training and overlap provenance</SourceLink></p>
+    </>;
 }
 
-/* ─── CHART DATA HOOK ─── */
-function useEpochChartData(epochHistory) {
-    return useMemo(() => ({ data: epochHistory, xKey: "epoch", xLabel: "Epoch" }), [epochHistory]);
+function TrainingPage({ artifacts, lastChecked }) {
+    const { history, historySource } = artifacts;
+    return <>
+        <EvidenceNotice />
+        <DataRefreshBar lastChecked={lastChecked} source={historySource} />
+        <div className="page-header-bar"><h3>Recorded training history</h3><p className="page-desc">The bundled log contains one epoch on 512 training and 128 validation examples. Fetching the file does not start or observe a training job.</p></div>
+        <div className="charts-row">
+            <div className="card chart-card"><div className="chart-title">Training and validation loss</div>
+                <MetricsChart data={history} lines={[{ key: "train_loss", color: "#22d3ee", name: "Train" }, { key: "val_loss", color: "#a78bfa", name: "Validation" }]} areaFill /></div>
+            <div className="card chart-card"><div className="chart-title">Recorded accuracy and F1</div>
+                <MetricsChart data={history} lines={[{ key: "train_acc", color: "#34d399", name: "Train accuracy" }, { key: "val_acc", color: "#fbbf24", name: "Validation accuracy" }, { key: "val_f1", color: "#fb7185", name: "Validation F1" }]} /></div>
+        </div>
+        <div className="card section-card"><div className="section-title">Rows in the selected history file</div>
+            <table className="data-table"><thead><tr><th>Epoch</th><th>Train loss</th><th>Validation loss</th><th>Train accuracy</th><th>Validation accuracy</th><th>Validation F1</th></tr></thead>
+                <tbody>{history.map((row) => <tr key={row.epoch}><td>{row.epoch}</td><td>{number(row.train_loss, 4)}</td><td>{number(row.val_loss, 4)}</td><td>{percent(row.train_acc)}</td><td>{percent(row.val_acc)}</td><td>{number(row.val_f1, 4)}</td></tr>)}</tbody>
+            </table>
+        </div>
+        <p className="page-desc"><SourceLink path="evidence/training_history.json">Original epoch values</SourceLink>{" · "}<SourceLink path="evidence/provenance.json">Recovered run provenance</SourceLink></p>
+    </>;
 }
 
-/* ─── INSIGHTS PAGE ─── */
-function InsightsPage({ metrics, history, prData, confusion, labels, pipeline, lastRefresh, isLiveData }) {
-    const { data: chartData, xKey } = useEpochChartData(history);
-
-    return (
-        <>
-            <div className="insights-note">
-                <span><strong>Training Overview</strong> - metrics are shown per epoch only (daily/weekly rollups removed).</span>
-                <span className="insights-note-chip">Epoch timeline only</span>
-            </div>
-
-            <DataRefreshBar lastRefresh={lastRefresh} isLiveData={isLiveData} />
-
-            {!isLiveData && (
-                <div className="metrics-source-banner demo">
-                    <strong>Verified static metrics are displayed.</strong>
-                    <span>
-                        KPI values and the one checked-in training epoch match the measured-results table in the repository. Connect `VITE_METRICS_URL` only when a live artifact source is available.
-                    </span>
-                </div>
-            )}
-
-            <div className="metrics-row">
-                <div className="card metric-card cyan">
-                    <div className="metric-header"><span className="metric-label">Accuracy</span><span className="metric-badge up">Held out</span></div>
-                    <div className="metric-value">{(metrics.accuracy * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">12,000 test articles</div>
-                </div>
-                <div className="card metric-card emerald">
-                    <div className="metric-header"><span className="metric-label">F1 Weighted</span><span className="metric-badge up">Verified</span></div>
-                    <div className="metric-value">{(metrics.f1_weighted * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">Evaluation artifact</div>
-                </div>
-                <div className="card metric-card amber">
-                    <div className="metric-header"><span className="metric-label">F1 Macro</span><span className="metric-badge up">Verified</span></div>
-                    <div className="metric-value">{(metrics.f1_macro * 100).toFixed(1)}<span className="metric-unit">%</span></div>
-                    <div className="metric-sub">Four-class average</div>
-                </div>
-                <div className="card metric-card violet">
-                    <div className="metric-header"><span className="metric-label">MCC Score</span><span className="metric-badge up">Verified</span></div>
-                    <div className="metric-value">{metrics.mcc.toFixed(3)}</div>
-                    <div className="metric-sub">Matthews Correlation Coefficient</div>
-                </div>
-            </div>
-
-            <div className="charts-row">
-                <div className="card chart-card">
-                    <div className="chart-header">
-                        <div><div className="chart-title">Training Loss</div><div className="chart-subtitle">Loss convergence per epoch</div></div>
-                        <div className="chart-legend">
-                            <div className="legend-item"><div className="legend-dot" style={{ background: '#22d3ee' }} /> Train</div>
-                            <div className="legend-item"><div className="legend-dot" style={{ background: '#a78bfa' }} /> Validation</div>
-                        </div>
-                    </div>
-                    <MetricsChart data={chartData} lines={[{ key: "train_loss", color: "#22d3ee", name: "Train Loss" }, { key: "val_loss", color: "#a78bfa", name: "Val Loss" }]} xKey={xKey} areaFill />
-                </div>
-                {isLiveData ? (
-                    <div className="card chart-card">
-                        <div className="chart-header"><div><div className="chart-title">Precision-Recall Curve</div><div className="chart-subtitle">Loaded from the configured metrics source</div></div></div>
-                        <PRAUCChart data={prData} />
-                    </div>
-                ) : (
-                    <div className="card chart-card">
-                        <div className="chart-header"><div><div className="chart-title">Precision-Recall Curve</div><div className="chart-subtitle">Not present in the checked-in public evaluation snapshot</div></div></div>
-                        <div className="empty-state"><h4>No curve data claimed</h4><p>The dashboard avoids drawing a synthetic PR curve when only scalar evaluation metrics are verified.</p></div>
-                    </div>
-                )}
-            </div>
-
-            <div className="bottom-row">
-                <div className="card section-card"><div className="section-title">Pipeline Status</div><PipelineStatus steps={pipeline} /></div>
-                <div className="card section-card"><div className="section-title">Model Information</div><ModelCard /></div>
-                {isLiveData ? (
-                    <div className="card section-card"><div className="section-title">Confusion Matrix</div><ConfusionMatrix matrix={confusion} labels={labels} /></div>
-                ) : (
-                    <div className="card section-card"><div className="section-title">Confusion Matrix</div><div className="empty-state"><h4>Artifact not published</h4><p>Class-wise precision, recall, F1, and support remain available in the repository.</p></div></div>
-                )}
-            </div>
-        </>
-    );
-}
-
-/* ─── TRAINING PAGE ─── */
-function TrainingPage({ history, lastRefresh, isLiveData }) {
-    const { data: chartData, xKey } = useEpochChartData(history);
-
-    const lossLines = [{ key: "train_loss", color: "#22d3ee", name: "Train" }, { key: "val_loss", color: "#a78bfa", name: "Val" }];
-    const accLines = [{ key: "train_acc", color: "#34d399", name: "Train Acc" }, { key: "val_acc", color: "#fbbf24", name: "Val Acc" }, { key: "val_f1", color: "#fb7185", name: "Val F1" }];
-
-    return (
-        <>
-            <div className="page-header-bar">
-                <h3>Training History</h3>
-                <p className="page-desc">All training runs and their performance metrics</p>
-            </div>
-
-            <DataRefreshBar lastRefresh={lastRefresh} isLiveData={isLiveData} />
-
-            <div className="charts-row">
-                <div className="card chart-card">
-                    <div className="chart-header">
-                        <div><div className="chart-title">Loss Convergence</div><div className="chart-subtitle">Per epoch</div></div>
-                        <div className="chart-legend">
-                            {lossLines.map(l => <div key={l.key} className="legend-item"><div className="legend-dot" style={{ background: l.color }} />{l.name}</div>)}
-                        </div>
-                    </div>
-                    <MetricsChart data={chartData} lines={lossLines} xKey={xKey} areaFill />
-                </div>
-                <div className="card chart-card">
-                    <div className="chart-header">
-                        <div><div className="chart-title">Accuracy & F1</div><div className="chart-subtitle">Per epoch</div></div>
-                        <div className="chart-legend">
-                            {accLines.map(l => <div key={l.key} className="legend-item"><div className="legend-dot" style={{ background: l.color }} />{l.name}</div>)}
-                        </div>
-                    </div>
-                    <MetricsChart data={chartData} lines={accLines} xKey={xKey} areaFill />
-                </div>
-            </div>
-
-            <div className="card section-card">
-                <div className="section-title">Recent Training Runs</div>
-                <table className="data-table">
-                    <thead><tr><th>Run ID</th><th>Started</th><th>Duration</th><th>Epochs</th><th>Best Loss</th><th>Best Acc</th><th>Status</th></tr></thead>
-                    <tbody>
-                        <tr><td className="mono">run-20260220-153412</td><td>Feb 20, 2026 15:34</td><td>34m 12s</td><td>3</td><td>0.14</td><td>95.3%</td><td><span className="status-chip success">Completed</span></td></tr>
-                        <tr><td className="mono">run-20260219-091802</td><td>Feb 19, 2026 09:18</td><td>31m 44s</td><td>3</td><td>0.18</td><td>93.1%</td><td><span className="status-chip success">Completed</span></td></tr>
-                        <tr><td className="mono">run-20260218-142530</td><td>Feb 18, 2026 14:25</td><td>18m 06s</td><td>2/3</td><td>0.25</td><td>90.8%</td><td><span className="status-chip warning">Stopped</span></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-/* ─── MODELS PAGE ─── */
 function ModelsPage() {
-    return (
-        <>
-            <div className="page-header-bar"><h3>Model Registry</h3><p className="page-desc">Registered models and their versions</p></div>
-            <div className="metrics-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '1rem' }}>
-                <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Total Models</span></div><div className="metric-value">3</div><div className="metric-sub">Across 1 architecture</div></div>
-                <div className="card metric-card emerald"><div className="metric-header"><span className="metric-label">Production</span></div><div className="metric-value">v3</div><div className="metric-sub">Current serving version</div></div>
-                <div className="card metric-card amber"><div className="metric-header"><span className="metric-label">Avg Size</span></div><div className="metric-value">255<span className="metric-unit">MB</span></div><div className="metric-sub">DistilBERT base</div></div>
-            </div>
-            <div className="card section-card">
-                <div className="section-title">All Versions</div>
-                <table className="data-table">
-                    <thead><tr><th>Model</th><th>Version</th><th>Accuracy</th><th>F1</th><th>MCC</th><th>Size</th><th>Status</th></tr></thead>
-                    <tbody>
-                        <tr><td>distilbert-agnews</td><td className="mono">v3</td><td>91.4%</td><td>91.3%</td><td>0.886</td><td>255 MB</td><td><span className="status-chip success">Production</span></td></tr>
-                        <tr><td>distilbert-agnews</td><td className="mono">v2</td><td>90.8%</td><td>90.6%</td><td>0.877</td><td>255 MB</td><td><span className="status-chip muted">Archived</span></td></tr>
-                        <tr><td>distilbert-agnews</td><td className="mono">v1</td><td>88.9%</td><td>88.8%</td><td>0.852</td><td>255 MB</td><td><span className="status-chip muted">Archived</span></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
+    const record = provenance.checkpoint;
+    return <>
+        <EvidenceNotice />
+        <div className="page-header-bar"><h3>Historical checkpoint record</h3><p className="page-desc">This view describes the saved checkpoint. It is not connected to a production model registry.</p></div>
+        <div className="charts-row"><div className="card section-card"><div className="section-title">Training configuration</div><ModelCard /></div>
+            <div className="card section-card"><div className="section-title">Artifact identity</div>
+                <p className="page-desc">Checkpoint: <code>{record.id}</code></p>
+                <p className="page-desc">Recorded size: {record.bytes.toLocaleString()} bytes · {record.format}</p>
+                <p className="page-desc">SHA-256: <code style={{ overflowWrap: "anywhere" }}>{record.sha256}</code></p>
+                <p className="page-desc">A file hash identifies the recorded artifact; it does not establish a current deployment or leakage-free evaluation.</p>
+                <SourceLink path="evidence/provenance.json">Inspect the complete provenance record</SourceLink>
+            </div></div>
+    </>;
 }
 
-/* ─── ENDPOINTS PAGE ─── */
-function EndpointsPage() {
-    return (
-        <>
-            <div className="page-header-bar"><h3>Endpoints</h3><p className="page-desc">SageMaker inference endpoints</p></div>
-            <div className="card section-card">
-                <div className="empty-state">
-                    <div className="empty-icon">{Icons.endpoints}</div>
-                    <h4>No Active Endpoints</h4>
-                    <p>SageMaker endpoints are disabled in Terraform to avoid costs. Uncomment in <code>sagemaker.tf</code> and run <code>terraform apply</code> when ready.</p>
-                </div>
-            </div>
-            <div className="card section-card" style={{ marginTop: '1rem' }}>
-                <div className="section-title">Endpoint Pricing Estimate</div>
-                <table className="data-table">
-                    <thead><tr><th>Instance</th><th>vCPU</th><th>Memory</th><th>Price/hr</th><th>Monthly (24/7)</th></tr></thead>
-                    <tbody>
-                        <tr><td className="mono">ml.t2.medium</td><td>2</td><td>4 GB</td><td>$0.065</td><td>$47.45</td></tr>
-                        <tr><td className="mono">ml.m5.large</td><td>2</td><td>8 GB</td><td>$0.134</td><td>$97.82</td></tr>
-                        <tr><td className="mono">ml.m5.xlarge</td><td>4</td><td>16 GB</td><td>$0.269</td><td>$196.37</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
+function DataPage() {
+    const prepared = provenance.prepared_data;
+    const run = provenance.training_run;
+    const overlap = provenance.overlap_audit;
+    return <>
+        <div className="page-header-bar"><h3>Prepared data and fitted samples</h3><p className="page-desc">Preparing a pool and fitting a checkpoint are separate steps.</p></div>
+        <div className="metrics-row">
+            {[["Prepared training pool", prepared.train_pool, "Available pool; not all fitted", "cyan"],
+              ["Actually used for training", run.training_examples, "Recorded checkpoint fit", "emerald"],
+              ["Actually used for validation", run.validation_examples, "Recorded checkpoint selection", "amber"],
+              ["Historical evaluation split", prepared.test, "Project-created split", "violet"]].map(([label, value, detail, color]) =>
+                <div className={`card metric-card ${color}`} key={label}><div className="metric-label">{label}</div><div className="metric-value">{value.toLocaleString()}</div><div className="metric-sub">{detail}</div></div>)}
+        </div>
+        <div className="card section-card"><div className="section-title">Known evaluation limits</div>
+            <p className="page-desc">{prepared.note}</p>
+            <p className="page-desc">The prepared validation pool has {prepared.validation_pool.toLocaleString()} rows. The recorded run used only {run.validation_examples} of them.</p>
+            <p className="page-desc">The normalized-text audit found {overlap.train_pool_vs_validation} shared texts between the training and validation pools, {overlap.train_pool_vs_test} between the training pool and evaluation split, and {overlap.validation_vs_test} between validation and evaluation.</p>
+            <p className="page-desc">Fitted-subset overlap: {overlap.fitted_subset_overlap} The training random seed was not recorded.</p>
+            <SourceLink path="evidence/provenance.json">Review data counts and overlap evidence</SourceLink>
+        </div>
+    </>;
 }
 
-/* ─── DATA PAGE ─── */
-function DataPage({ pipeline }) {
-    return (
-        <>
-            <div className="page-header-bar"><h3>Data Pipeline</h3><p className="page-desc">Data ingestion, preprocessing, and dataset storage</p></div>
-            <div className="metrics-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Total Samples</span></div><div className="metric-value">120<span className="metric-unit">K</span></div><div className="metric-sub">AG News dataset</div></div>
-                <div className="card metric-card emerald"><div className="metric-header"><span className="metric-label">Train Split</span></div><div className="metric-value">96<span className="metric-unit">K</span></div><div className="metric-sub">80% · 27 MB</div></div>
-                <div className="card metric-card amber"><div className="metric-header"><span className="metric-label">Validation</span></div><div className="metric-value">12<span className="metric-unit">K</span></div><div className="metric-sub">10% · 3.3 MB</div></div>
-                <div className="card metric-card violet"><div className="metric-header"><span className="metric-label">Test</span></div><div className="metric-value">12<span className="metric-unit">K</span></div><div className="metric-sub">10% · 3.3 MB</div></div>
-            </div>
-            <div className="card section-card" style={{ marginTop: '1rem' }}>
-                <div className="section-title">Pipeline Steps</div>
-                <PipelineStatus steps={pipeline} />
-            </div>
-            <div className="card section-card" style={{ marginTop: '1rem' }}>
-                <div className="section-title">S3 Storage</div>
-                <table className="data-table">
-                    <thead><tr><th>Bucket</th><th>Files</th><th>Size</th><th>Last Modified</th><th>Status</th></tr></thead>
-                    <tbody>
-                        <tr><td className="mono">llmop-ml-data-dev</td><td>5</td><td>70.4 MB</td><td>Feb 20, 19:00</td><td><span className="status-chip success">Synced</span></td></tr>
-                        <tr><td className="mono">llmop-ml-models-dev</td><td>0</td><td>—</td><td>—</td><td><span className="status-chip muted">Awaiting training</span></td></tr>
-                        <tr><td className="mono">llmop-ml-metrics-dev</td><td>2</td><td>1.7 KB</td><td>Feb 20, 19:00</td><td><span className="status-chip success">Synced</span></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-/* ─── INFRA PAGE ─── */
-function InfraPage() {
-    return (
-        <>
-            <div className="page-header-bar"><h3>Infrastructure</h3><p className="page-desc">AWS resources provisioned via Terraform in us-east-1</p></div>
-            <div className="metrics-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '1rem' }}>
-                <div className="card metric-card emerald"><div className="metric-header"><span className="metric-label">Resources</span></div><div className="metric-value">28</div><div className="metric-sub">Terraform managed</div></div>
-                <div className="card metric-card cyan"><div className="metric-header"><span className="metric-label">Monthly Cost</span></div><div className="metric-value">$0<span className="metric-unit">.00</span></div><div className="metric-sub">Current estimate</div></div>
-                <div className="card metric-card amber"><div className="metric-header"><span className="metric-label">Region</span></div><div className="metric-value" style={{ fontSize: '1.2rem' }}>us-east-1</div><div className="metric-sub">N. Virginia</div></div>
-            </div>
-            <div className="card section-card">
-                <div className="section-title">Provisioned Resources</div>
-                <table className="data-table">
-                    <thead><tr><th>Service</th><th>Resource</th><th>Name</th><th>Status</th></tr></thead>
-                    <tbody>
-                        <tr><td>S3</td><td>Bucket</td><td className="mono">llmop-ml-data-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>S3</td><td>Bucket</td><td className="mono">llmop-ml-models-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>S3</td><td>Bucket</td><td className="mono">llmop-ml-metrics-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>ECR</td><td>Repository</td><td className="mono">llmop-training-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>IAM</td><td>Role</td><td className="mono">llmop-sagemaker-execution-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>IAM</td><td>Role</td><td className="mono">llmop-lambda-execution-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>Lambda</td><td>Function</td><td className="mono">llmop-pipeline-trigger-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>CloudWatch</td><td>Dashboard</td><td className="mono">llmop-dashboard-dev</td><td><span className="status-chip success">Active</span></td></tr>
-                        <tr><td>CloudWatch</td><td>Alarm</td><td className="mono">training-failures</td><td><span className="status-chip success">OK</span></td></tr>
-                        <tr><td>CloudWatch</td><td>Alarm</td><td className="mono">lambda-errors</td><td><span className="status-chip success">OK</span></td></tr>
-                        <tr><td>SageMaker</td><td>Model</td><td className="mono">—</td><td><span className="status-chip muted">Pending image</span></td></tr>
-                        <tr><td>SageMaker</td><td>Endpoint</td><td className="mono">—</td><td><span className="status-chip muted">Disabled</span></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-/* ─── SETTINGS PAGE ─── */
-function SettingsPage() {
-    return (
-        <>
-            <div className="page-header-bar"><h3>Settings</h3><p className="page-desc">Project configuration and environment details</p></div>
-            <div className="charts-row">
-                <div className="card section-card">
-                    <div className="section-title">Model Configuration</div>
-                    <ModelCard />
-                </div>
-                <div className="card section-card">
-                    <div className="section-title">Environment</div>
-                    <div className="info-row"><span className="info-label">Project Name</span><span className="info-value">llmop</span></div>
-                    <div className="info-row"><span className="info-label">Environment</span><span className="info-value">dev</span></div>
-                    <div className="info-row"><span className="info-label">AWS Region</span><span className="info-value">us-east-1</span></div>
-                    <div className="info-row"><span className="info-label">Account ID</span><span className="info-value">396081123986</span></div>
-                    <div className="info-row"><span className="info-label">ECR Registry</span><span className="info-value">public.ecr.aws/b3e7b0p8</span></div>
-                    <div className="info-row"><span className="info-label">SageMaker Role</span><span className="info-value" style={{ fontSize: '0.68rem' }}>llmop-sagemaker-execution-dev</span></div>
-                    <div className="info-row"><span className="info-label">Terraform State</span><span className="info-value">Local</span></div>
-                    <div className="info-row"><span className="info-label">Dashboard</span><span className="info-value">Netlify</span></div>
-                </div>
-            </div>
-            <div className="card section-card" style={{ marginTop: '1rem' }}>
-                <div className="section-title">CI/CD Pipelines</div>
-                <table className="data-table">
-                    <thead><tr><th>Workflow</th><th>Trigger</th><th>Actions</th><th>File</th></tr></thead>
-                    <tbody>
-                        <tr><td>CI</td><td>Push / PR</td><td>Lint → Test → Docker Build</td><td className="mono">ci.yml</td></tr>
-                        <tr><td>Terraform</td><td>Push to main (terraform/)</td><td>Plan → Apply</td><td className="mono">terraform.yml</td></tr>
-                        <tr><td>ML Pipeline</td><td>Push to main (src/) / Manual</td><td>Build → ECR → SageMaker</td><td className="mono">ml-pipeline.yml</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
+function DeploymentPage() {
+    return <>
+        <div className="page-header-bar"><h3>Deployment guide</h3><p className="page-desc">Repository capabilities and setup instructions; no cloud status feed is connected to this view.</p></div>
+        <div className="card section-card"><div className="section-title">What can be inspected</div>
+            <p className="page-desc">The project includes a local classification API and infrastructure configuration. Configuration files do not establish that a cloud resource is running, that a model is registered, or that a service has a particular cost or uptime.</p>
+            <p className="page-desc">The Test Model view identifies whether an individual result came from a configured API or the transparent browser keyword demonstration.</p>
+            <p className="page-desc"><SourceLink path="README.md">Run and deployment instructions</SourceLink>{" · "}<SourceLink path="src/serving/api.py">Classification API implementation</SourceLink></p>
+        </div>
+    </>;
 }
 
 export default App;
