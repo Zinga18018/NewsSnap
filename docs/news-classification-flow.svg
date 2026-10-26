@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1020" viewBox="0 0 1200 1020" role="img" aria-labelledby="title desc">
+  <title id="title">NewsSnap: request to topic, with the inference mode attached</title>
+  <desc id="desc">A React or Streamlit client posts news text to FastAPI. A loaded checkpoint runs DistilBERT; otherwise the API returns an explicit keyword demo. Streamlit and React each have a deterministic local keyword baseline when the API is unreachable or unconfigured. Historical metric files are served separately with a source header. New training happens in AI Engineering Lab.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1428"/><stop offset="1" stop-color="#13243a"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#8aa5c4"/></marker>
+    <marker id="tealArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#5ddbc6"/></marker>
+    <style>
+      text{font-family:Segoe UI,Arial,sans-serif;fill:#e9f0fa} .kicker{font-size:14px;font-weight:700;letter-spacing:2px;fill:#7cdacb}.title{font-size:31px;font-weight:700}.sub{font-size:17px;fill:#abc0d8}.label{font-size:18px;font-weight:700}.body{font-size:16px;fill:#c2d1e3}.mono{font-family:Consolas,monospace;font-size:16px}.tiny{font-size:14px;fill:#a7bbd3}.box{fill:#172b43;stroke:#385371;stroke-width:1.5}.real{fill:#103d3d;stroke:#4cc5b3;stroke-width:1.5}.demo{fill:#392e24;stroke:#d5aa68;stroke-width:1.5}.wire{fill:none;stroke:#8aa5c4;stroke-width:2;marker-end:url(#arrow)}.dash{stroke-dasharray:6 6}
+    </style>
+  </defs>
+  <rect width="1200" height="1020" rx="22" fill="url(#bg)"/>
+  <text class="kicker" x="48" y="49">NEWSSNAP / SERVING WALKTHROUGH</text>
+  <text class="title" x="48" y="94">One request. An explicit inference mode.</text>
+  <text class="sub" x="48" y="125">Four news topics • model inference and demo output stay distinguishable</text>
+  <line x1="48" y1="151" x2="1152" y2="151" stroke="#304863"/>
+  <text class="kicker" x="48" y="187">01 / RECEIVE</text>
+  <rect class="box" x="48" y="207" width="262" height="106" rx="12"/>
+  <text class="label" x="69" y="240">React or Streamlit</text>
+  <text class="body" x="69" y="267">Headline or article text</text>
+  <text class="mono" x="69" y="292">POST /predict</text>
+  <path class="wire" d="M310 260H370"/>
+  <rect class="box" x="370" y="207" width="302" height="106" rx="12"/>
+  <text class="label" x="391" y="240">FastAPI validates input</text>
+  <text class="body" x="391" y="267">Up to 32 texts per request</text>
+  <text class="body" x="391" y="292">Up to 5,000 characters per text</text>
+  <path class="wire" d="M672 260H732"/>
+  <rect class="box" x="732" y="207" width="420" height="106" rx="12"/>
+  <text class="label" x="754" y="240">Checkpoint loaded at startup?</text>
+  <text class="body" x="754" y="267">Existing model + tokenizer files</text>
+  <text class="tiny" x="754" y="292">A failed model load also selects demo mode.</text>
+  <text class="kicker" x="48" y="367">02 / CLASSIFY</text>
+  <path class="wire" d="M837 313V348H290V404"/>
+  <text class="tiny" x="308" y="390">YES</text>
+  <path class="wire" d="M1046 313V404"/>
+  <text class="tiny" x="1062" y="390">NO</text>
+  <rect class="real" x="48" y="404" width="524" height="141" rx="12"/>
+  <text class="label" x="70" y="438">DistilBERT classification</text>
+  <text class="body" x="70" y="467">Tokenizer → model logits → softmax scores</text>
+  <text class="body" x="70" y="492">128 tokens by default; four topic classes</text>
+  <text class="mono" x="70" y="521" fill="#75e7d5">mode: real</text>
+  <rect class="demo" x="628" y="404" width="524" height="141" rx="12"/>
+  <text class="label" x="650" y="438">API keyword demo</text>
+  <text class="body" x="650" y="467">Keyword matches + random score jitter</text>
+  <text class="body" x="650" y="492">Illustrative scores; simulated latency</text>
+  <text class="mono" x="650" y="521">mode: demo · model: demo-heuristic</text>
+  <path class="wire" d="M310 545V573H460V602"/>
+  <path class="wire" d="M890 545V573H740V602"/>
+  <rect class="box" x="312" y="602" width="576" height="88" rx="12"/>
+  <text class="label" x="336" y="635">Return topic, class scores, model, and mode</text>
+  <text class="body" x="336" y="665">Client displays the result and identifies the inference path.</text>
+  <rect x="48" y="718" width="1104" height="87" rx="12" fill="#122437" stroke="#385371"/>
+  <text class="label" x="70" y="750">If the API cannot be reached</text>
+  <text class="body" x="70" y="779">Each client uses its own deterministic keyword baseline. Streamlit: offline-fallback; React: mode demo.</text>
+  <line x1="48" y1="835" x2="1152" y2="835" stroke="#304863"/>
+  <text class="kicker" x="48" y="868">SEPARATE PATHS / TRACEABILITY</text>
+  <rect class="box" x="48" y="889" width="524" height="82" rx="12"/>
+  <text class="label" x="70" y="922">GET /metrics/*</text>
+  <text class="body" x="70" y="949">Model record → historical fallback + source header</text>
+  <rect class="box" x="628" y="889" width="524" height="82" rx="12" stroke-dasharray="6 6"/>
+  <text class="label" x="650" y="922">New training: AI Engineering Lab</text>
+  <text class="body" x="650" y="949">Separate repo → checkpoint files + run manifests</text>
+  <text class="tiny" x="48" y="1001">Source: src/serving/api.py · src/serving/inference.py · streamlit_demo/streamlit_app.py</text>
+</svg>

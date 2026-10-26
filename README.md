@@ -1,20 +1,31 @@
-# NewsSnap: News Classification and Serving
+# NewsSnap · news topic classification
 
-NewsSnap classifies English news into **World, Sports, Business, and Sci/Tech**.
-This repository preserves the original FastAPI service, Streamlit client, React
-dashboard, and data-preparation code. The maintained training implementation is
-in [AI Engineering Lab / NewsSnap](https://github.com/Zinga18018/ai-engineering-lab/tree/main/newssnap).
+Send an English headline or article to the API and get one of four topics:
+**World, Sports, Business, or Sci/Tech**. This repository contains the FastAPI
+service, React dashboard, Streamlit demo, and original data-preparation code.
+New model experiments live in
+[AI Engineering Lab / NewsSnap](https://github.com/Zinga18018/ai-engineering-lab/tree/main/newssnap).
 
 [Workflow and code walkthrough](WORKFLOW.md) ·
 [Streamlit demo](https://yogesh-newssnap-classifier.streamlit.app/)
+
+For a quick review, follow [one request through the code](#architecture),
+[run the API locally](#run-the-serving-application), then read the
+[experiment evidence](#experiment-evidence) before interpreting the scores.
 
 ## What the project demonstrates
 
 A news article enters a validated API, is tokenized and classified by a saved
 DistilBERT checkpoint, and returns topic scores to the client. When model weights
 are unavailable, the API explicitly reports demo mode and uses a keyword fallback.
-Check the response mode before describing an output as a transformer prediction.
-Softmax scores are not calibrated probabilities of correctness.
+The response carries `mode: "real"` for a loaded model or `mode: "demo"` for
+the API's keyword heuristic. The Streamlit client has a deterministic
+`offline-fallback` if it cannot reach the API. The React client uses a separate
+deterministic browser baseline (`transparent-browser-fallback`, `mode: "demo"`)
+when its API is unavailable or unconfigured. API demo scores include random
+jitter and its displayed latency is simulated. Check the mode before interpreting
+an output; demo scores are illustrative and model softmax scores are not
+calibrated probabilities of correctness.
 
 ## Experiment evidence
 
@@ -49,30 +60,75 @@ of the original checkpoint.
 
 ## Architecture
 
+![Request handling, inference branches, and separate historical evidence in NewsSnap](docs/news-classification-flow.svg)
+
+The diagram follows the serving path in this repository. The dashed training
+link points to a separate repository; it is not a training stage run by this API.
+
 ```mermaid
-flowchart LR
-    A["News text"] --> B["FastAPI validation"]
-    B --> C{"Model available?"}
-    C -->|Yes| D["Tokenize and run DistilBERT"]
-    C -->|No| E["Explicit keyword demo"]
-    D --> F["Topic and class scores"]
-    E --> F
-    F --> G["Streamlit or React client"]
-    H["Maintained training in AI Engineering Lab"] -.-> I["Checkpoint and manifests"]
-    I -.-> D
+flowchart TD
+    A["React or Streamlit: submit news text"] --> B["POST /predict: validate text and batch size"]
+    B --> C{"API startup loaded a checkpoint?"}
+    C -->|Yes| D["Tokenizer → DistilBERT → softmax"]
+    C -->|No| E["Keyword heuristic + random score jitter"]
+    D --> F["Topic + class scores + mode: real"]
+    E --> G["Topic + illustrative scores + mode: demo"]
+    F --> H["Client shows result and inference mode"]
+    G --> H
+    A -->|API unreachable or unconfigured| I["Client-local keyword baseline: explicitly labeled fallback"]
+    J["AI Engineering Lab: new training runs"] -.->|Manual artifact transfer| K["Checkpoint files loaded at API startup"]
+    K -.-> C
+    L["GET /metrics/*"] --> M{"Corresponding model-directory record exists?"}
+    M -->|Yes| N["Serve that record + X-Metrics-Source"]
+    M -->|No| O["Serve tracked historical evidence + X-Metrics-Source"]
 ```
+
+| Step | Implementation | Why it matters |
+| --- | --- | --- |
+| Request validation | [`PredictRequest` and `/predict`](src/serving/api.py), [`validate_text`](src/utils/validation.py) | Limits requests to 32 texts and 5,000 characters per text. |
+| Model inference | [`model_fn` / `predict_fn`](src/serving/inference.py) | Loads local checkpoint files; pads/truncates to 128 tokens by default and returns four class scores. |
+| Missing weights | [`_load_model` / `_demo_predict`](src/serving/api.py) | Keeps the UI usable while explicitly reporting a heuristic result. |
+| API unavailable | [Streamlit fallback](streamlit_demo/streamlit_app.py), [React fallback](dashboard/src/demoClassifier.js), [client handling](dashboard/src/components/TestModelPage.jsx) | Each client has its own deterministic keyword baseline and identifies the fallback. |
+| Evidence source | [`_metrics_source`](src/serving/api.py) | Identifies model-directory versus historical files without implying a fresh experiment. |
+
+## Key decisions
+
+- **Expose the inference mode.** Missing weights and an unavailable API are
+  different states. Their fallback paths are visible so a working demo cannot be
+  mistaken for verified transformer inference.
+- **Keep new training separate.** The legacy training commands stop with migration
+  instructions. The maintained project records sample IDs and manifests for new
+  experiments; those records cannot repair the recovered checkpoint's history.
+- **Publish supplied records, not example metrics.** The publisher validates local
+  evaluation files and hashes them before any explicitly requested upload.
 
 ## Run the serving application
 
+Use Python 3.11 (the CI version) in an activated virtual environment. From the
+repository root:
+
 ```bash
-pip install -r requirements-runtime.txt
+python -m pip install -r requirements-runtime.txt
 python -m uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
 ```
 
 The React build requires Node 20.19+ or 22.12+, matching the [Vite requirements](https://vite.dev/guide/).
 
-Without weights in `models/latest`, the service reports demo mode. Model weights
-are not downloaded by these instructions. Start the React client separately:
+Open `http://127.0.0.1:8000/docs`. Call `GET /health` to see the current mode,
+then try `POST /predict` with this synthetic example:
+
+```json
+{"text": "The team won the championship after scoring twice in the final match."}
+```
+
+The response includes `label`, `probabilities`, `model`, and `mode`. On a clean
+clone with no checkpoint or S3 configuration, expect `demo` / `demo-heuristic`.
+`MODEL_DIR` can point to an existing checkpoint. An optional `S3_BUCKET_MODELS`
+setting activates a download attempt at startup; no S3 setting is needed for
+the local demo.
+
+Without usable weights in `models/latest`, the service reports demo mode.
+Start the React client separately:
 
 ```bash
 cd dashboard
@@ -118,7 +174,7 @@ experiment was performed correctly. No cloud upload was needed for this repair.
 ## Quality checks
 
 ```bash
-pip install -r requirements-test.txt
+python -m pip install -r requirements-test.txt
 python -m pytest tests -q
 cd dashboard
 npm test
@@ -136,14 +192,13 @@ dependency check, not a security guarantee. A large-bundle warning remains.
 CI validates the Python code, clients, and serving image; consult the actual
 workflow result for the current commit.
 
-## Interview explanation
+## A concise walkthrough
 
-“I built a news-classification service and audited its recovered model records.
-The saved checkpoint used 512 training examples from a larger prepared pool.
-I made the incomplete history explicit, removed example scores from the
-publishing path, and moved new experiments to a workflow that records sample IDs
-and model artifacts. The public demo distinguishes model inference from fallback
-behavior.”
+The service validates a news snippet, selects the loaded-model or keyword-demo
+path, and returns the topic with its inference mode. Its recovered checkpoint
+records 512 training examples from a larger prepared pool. The evidence audit
+documents the missing sample IDs and split overlap. New training runs use the
+maintained project so sample IDs and model artifacts can be traced from the start.
 
 ## Limitations
 
