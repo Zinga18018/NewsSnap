@@ -1,0 +1,2 @@
+# Optional plot reproduction only; no model execution or API credentials.
+matplotlib==3.10.8

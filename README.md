@@ -58,12 +58,21 @@ The maintained implementation records sample IDs, split checks, and checkpoint
 manifests for **new runs**. Those records do not reconstruct the missing history
 of the original checkpoint.
 
+![Recorded NewsSnap confusion matrix: 3,000 examples per topic, from the historical 12,000-example project-created test split.](docs/images/recorded-confusion-matrix.svg)
+
+The matrix plots the recorded counts, not a new evaluation. The split-overlap
+limits above still apply. Reproduce it without model weights or network access:
+
+```sh
+python -m pip install -r requirements-visuals.txt
+python scripts/plot_recorded_evaluation.py
+python scripts/plot_recorded_evaluation.py --check
+```
+
 ## Architecture
 
-![Request handling, inference branches, and separate historical evidence in NewsSnap](docs/news-classification-flow.svg)
-
-The diagram follows the serving path in this repository. The dashed training
-link points to a separate repository; it is not a training stage run by this API.
+The Mermaid diagram follows the serving path. Training lives in a separate
+repository; it is not a stage run by this API.
 
 ```mermaid
 flowchart TD
